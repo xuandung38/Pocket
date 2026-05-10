@@ -7,6 +7,7 @@ import FeedScreen from "@/screens/FeedScreen";
 import MessagesScreen from "@/screens/MessagesScreen";
 import ProfileScreen from "@/screens/ProfileScreen";
 import { useSwipeNav } from "@/hooks/useSwipeNav";
+import { useAuthStore } from "@/stores";
 
 function decodeJwtPayload(token) {
   try {
@@ -24,7 +25,9 @@ function decodeJwtPayload(token) {
 function isTokenValid(token) {
   if (!token) return false;
   const payload = decodeJwtPayload(token);
-  if (!payload?.exp) return true;
+  // Malformed/unparseable token → treat as invalid (was returning true incorrectly)
+  if (!payload) return false;
+  if (!payload.exp) return true;
   return payload.exp > Date.now() / 1000;
 }
 
@@ -72,13 +75,14 @@ export default function App() {
 
   const handleBackToCamera = useCallback(() => setNavState("camera"), []);
 
-  const handleLogout = useCallback(() => {
-    localStorage.removeItem("idToken");
-    localStorage.removeItem("localId");
-    localStorage.removeItem("refreshToken");
-    sessionStorage.removeItem("idToken");
-    sessionStorage.removeItem("localId");
-    sessionStorage.removeItem("refreshToken");
+  const handleLogout = useCallback(async () => {
+    // clearAndlogout (note lowercase 'l' — intentional method name) handles:
+    // server logout, removeToken, clearAllDB, userData cache, axios cachedExp reset.
+    try {
+      await useAuthStore.getState().clearAndlogout();
+    } catch {
+      // Even on failure, force local logout so user isn't stuck
+    }
     setAuthed(false);
   }, []);
 
@@ -99,7 +103,10 @@ export default function App() {
       <SocketProvider>
         <main
           className="relative h-full overflow-hidden"
-          style={{ touchAction: "pan-y" }}
+          // "manipulation" allows native pan (children's pan-x/pan-y work) and pinch,
+          // disables double-tap-zoom. JS swipe nav still fires via touchstart/touchend.
+          // Previously "pan-y" blocked horizontal scrollers (e.g. FriendMomentRow).
+          style={{ touchAction: "manipulation" }}
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}
         >

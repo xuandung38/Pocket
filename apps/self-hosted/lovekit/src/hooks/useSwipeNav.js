@@ -27,10 +27,16 @@ export function useSwipeNav(navState, setNavState) {
         if (!isHoriz && dy < -THRESHOLD) setNavState("feed");
         else if (isHoriz && dx < -THRESHOLD) setNavState("messages");
         else if (isHoriz && dx > THRESHOLD) setNavState("profile");
-        return;
+      } else if (navState === "feed") {
+        // Only swipe DOWN from feed → camera; swipe-up is internal scroll-snap nav
+        if (!isHoriz && dy > THRESHOLD) setNavState("camera");
+      } else if (navState === "messages") {
+        // Only swipe RIGHT from messages → camera (messages slides in from left)
+        if (isHoriz && dx > THRESHOLD) setNavState("camera");
+      } else if (navState === "profile") {
+        // Only swipe LEFT from profile → camera (profile slides in from right)
+        if (isHoriz && dx < -THRESHOLD) setNavState("camera");
       }
-
-      setNavState("camera");
     },
     [navState, setNavState],
   );

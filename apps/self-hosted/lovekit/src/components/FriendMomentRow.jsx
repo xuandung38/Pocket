@@ -48,7 +48,7 @@ export default function FriendMomentRow({ className }) {
           "[&::-webkit-scrollbar]:hidden",
           className,
         )}
-        style={{ scrollbarWidth: "none" }}
+        style={{ scrollbarWidth: "none", touchAction: "pan-x" }}
         role="list"
         aria-label="Friend moments"
       >
