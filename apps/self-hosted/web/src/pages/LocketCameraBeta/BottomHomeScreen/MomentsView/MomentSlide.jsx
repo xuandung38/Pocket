@@ -1,11 +1,19 @@
-import LoadingRing from "@/components/ui/Loading/ring";
-import { X } from "lucide-react";
+import { MoreVertical, X } from "lucide-react";
 import { useState } from "react";
 import CaptionOverlay from "./CaptionOverlay";
 import UserInfo from "../Layout/UserInfoView";
+import { useApp } from "@/context/AppContext";
 
 const MomentSlide = ({ moment, me, handleClose }) => {
   const [isVideoReady, setIsVideoReady] = useState(false);
+  const { navigation, post } = useApp();
+  const { setOptionModalOpen } = navigation;
+  const { setSelectedMomentId } = post;
+
+  const handleOpenOptions = () => {
+    setSelectedMomentId(moment.id);
+    setOptionModalOpen(true);
+  };
 
   return (
     <div className="flex w-full flex-col justify-center items-center">
@@ -19,6 +27,14 @@ const MomentSlide = ({ moment, me, handleClose }) => {
           className="absolute flex justify-center items-center top-4 right-4 z-50 p-2 bg-black/40 rounded-full hover:bg-black/60"
         >
           <X className="w-6 h-6 text-white" />
+        </button>
+
+        {/* Options button */}
+        <button
+          onClick={handleOpenOptions}
+          className="absolute flex justify-center items-center top-4 left-4 z-50 p-2 bg-black/40 rounded-full hover:bg-black/60"
+        >
+          <MoreVertical className="w-6 h-6 text-white" />
         </button>
 
         <div className="h-full w-full sm:max-w-sm max-w-md aspect-square flex items-center justify-center relative bg-gradient-to-br from-base-300/20 to-base-100/20 rounded-[64px] overflow-hidden">
