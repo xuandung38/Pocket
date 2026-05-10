@@ -17,8 +17,9 @@ import { getMomentById } from "@/cache/momentDB";
 import { useMomentsStoreV2, useUploadQueueStore } from "@/stores";
 import { downloadByLink } from "@/utils/download-by-link";
 
-const OptionMoment = ({ setOptionModalOpen, isOptionModalOpen }) => {
-  const { post } = useApp();
+const OptionMoment = () => {
+  const { post, navigation } = useApp();
+  const { isOptionModalOpen, setOptionModalOpen } = navigation;
   const {
     selectedMomentId,
     setSelectedMomentId,
@@ -145,7 +146,7 @@ const OptionMoment = ({ setOptionModalOpen, isOptionModalOpen }) => {
 
         <p className="text-left text-sm mt-4 text-base-content/70">
           Bạn có thể tải về hình ảnh/video của bạn bè hoặc xoá chúng khỏi lịch
-          sử của bạn {selectedQueue}
+          sử của bạn
         </p>
 
         <div className="w-full flex flex-row justify-center items-center gap-3 mt-6">
