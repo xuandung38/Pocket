@@ -52,6 +52,9 @@ function screenStyle(screen, navState) {
     transform,
     transition: TRANSITION,
     willChange: "transform",
+    // visibility:hidden on inactive screens prevents cold-load flash
+    // (transitions are transform-based, so slide-in still animates visibly)
+    visibility: isActive ? "visible" : "hidden",
   };
 }
 

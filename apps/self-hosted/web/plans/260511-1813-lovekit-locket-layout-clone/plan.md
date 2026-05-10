@@ -1,7 +1,7 @@
 ---
 title: "Lovekit Locket Layout Clone — Swipe Nav + Critical Bug Fixes"
 description: "Replace bottom-tab navigation with Locket swipe-gesture model. Bundle 7 critical bug fixes: SocketContext stale null, FriendStore field mismatch, JWT escape(), safe-area gaps, camera stream leak."
-status: pending
+status: completed
 priority: P1
 effort: "15h"
 branch: "feat/fix-selfhost"
@@ -30,7 +30,7 @@ Rewrite Lovekit PWA navigation from bottom-tab-bar to Locket's swipe-gesture mod
 | 02 | [Camera Screen Redesign — Rounded Square + FriendMomentRow](./phase-02-camera-screen-redesign-rounded-square-friendmomentrow.md) | 4h | completed | — |
 | 03 | [Feed Screen Redesign — Fullscreen Scroll-Snap Swiper](./phase-03-feed-screen-redesign-fullscreen-scroll-snap-swiper.md) | 3h | completed | — |
 | 04 | [Bug Fixes — SocketContext + FriendStore + ChatDetail Safe-Area](./phase-04-bug-fixes-socketcontext-friendstore-chatdetail-safe-area.md) | 3h | completed | — |
-| 05 | [Polish + Smoke Test](./phase-05-polish-smoke-test.md) | 2h | pending | 01,02,03,04 |
+| 05 | [Polish + Smoke Test](./phase-05-polish-smoke-test.md) | 2h | completed | 01,02,03,04 |
 
 Phases 01–04 parallelizable (non-overlapping files). Phase 05 sequential after all.
 

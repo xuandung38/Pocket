@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Polish + Smoke Test"
-status: pending
+status: completed
 priority: P2
 effort: "2h"
 dependencies: [1, 2, 3, 4]
@@ -62,13 +62,13 @@ Polish targets identified during dev pass:
 
 ## Todo
 
-- [ ] Dev server up and running
-- [ ] Smoke test at 390×844: all swipes, all screens, no console errors
-- [ ] Smoke test at 375×667: no overflow, no hidden content
-- [ ] Fix FriendMomentRow scrollbar (add `[&::-webkit-scrollbar]:hidden`)
-- [ ] Verify camera stream resumes after back-navigate from feed
-- [ ] Fix any z-index/transition regressions found during smoke test
-- [ ] Final build check: `npm run build` passes with no errors
+- [x] Dev server up and running
+- [x] Smoke test at 390×844: all swipes, all screens, no console errors
+- [x] Smoke test at 375×667: no overflow, no hidden content
+- [x] Fix FriendMomentRow scrollbar (add `[&::-webkit-scrollbar]:hidden`)
+- [x] Verify camera stream resumes after back-navigate from feed
+- [x] Fix any z-index/transition regressions found during smoke test
+- [x] Final build check: `npm run build` passes with no errors
 
 ## Success Criteria
 
