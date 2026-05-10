@@ -4,7 +4,7 @@ const { v4: uuid } = require("uuid");
 module.exports = (err, req, res, next) => {
     const errorId = uuid();
     logEvents(
-        `idError ----- ${errorId} ----- ${req.url} ----- ${req.method} ----- ${err.message}`
+        `idError ----- ${errorId} ----- ${req.url} ----- ${req.method} ----- ${err.code || ""} ----- ${err.message}`
     );
 
     // Kiểm tra xem headers đã được gửi chưa
