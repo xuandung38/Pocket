@@ -14,6 +14,10 @@ import {
 
 const TOUCH_PULL_THRESHOLD = 60;
 
+// Resolve the owning user's uid for a moment.
+// Backend / cache may use any of these field names, so check all.
+const getMomentOwnerUid = (m) => m?.user ?? m?.userUid ?? m?.owner;
+
 function MomentSlide({ moment, friend, isOwn }) {
   const fullName =
     [friend?.firstName, friend?.lastName].filter(Boolean).join(" ").trim() ||
@@ -26,6 +30,30 @@ function MomentSlide({ moment, friend, isOwn }) {
   const caption = moment?.caption;
   const when = moment?.date || moment?.createTime;
 
+  // Per-slide video ref + IntersectionObserver: only the visible slide plays.
+  // Prevents all <video> elements from autoplaying simultaneously (perf).
+  const videoRef = useRef(null);
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry) return;
+        if (entry.isIntersecting) {
+          // play() returns a promise that may reject (e.g. autoplay policy);
+          // swallow to avoid unhandled-promise warnings.
+          const p = el.play();
+          if (p && typeof p.catch === "function") p.catch(() => {});
+        } else {
+          el.pause();
+        }
+      },
+      { threshold: 0.6 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [video]);
+
   return (
     <div
       className="relative w-full bg-black flex-shrink-0"
@@ -33,13 +61,14 @@ function MomentSlide({ moment, friend, isOwn }) {
     >
       {video ? (
         <video
+          ref={videoRef}
           src={video}
           poster={thumb}
           className="absolute inset-0 w-full h-full object-cover"
-          autoPlay
           muted
           loop
           playsInline
+          preload="metadata"
         />
       ) : thumb ? (
         <img
@@ -124,11 +153,19 @@ export default function FeedScreen({ className, onBack }) {
 
   const meUid = user?.uid || user?.localId || null;
 
+  // Fetch moments only when the authed user changes — avoid refetching when
+  // friend list mutates. (Zustand actions are stable refs.)
   useEffect(() => {
     if (!user) return;
     fetchMoments(user, null);
+  }, [user, fetchMoments]);
+
+  // Load friends only if missing — separate effect so it doesn't re-trigger
+  // moments fetch when `friends.length` flips from 0 → N.
+  useEffect(() => {
+    if (!user) return;
     if (!friends?.length) loadFriends?.();
-  }, [user, fetchMoments, loadFriends, friends?.length]);
+  }, [user, friends?.length, loadFriends]);
 
   useEffect(() => {
     const node = sentinelRef.current;
@@ -200,14 +237,17 @@ export default function FeedScreen({ className, onBack }) {
         </div>
       )}
 
-      {moments.map((m) => (
-        <MomentSlide
-          key={m.id}
-          moment={m}
-          friend={friendMap[m.user]}
-          isOwn={m.user === meUid}
-        />
-      ))}
+      {moments.map((m) => {
+        const ownerUid = getMomentOwnerUid(m);
+        return (
+          <MomentSlide
+            key={m.id}
+            moment={m}
+            friend={ownerUid ? friendMap[ownerUid] : null}
+            isOwn={ownerUid === meUid}
+          />
+        );
+      })}
 
       {moments.length > 0 && (
         <div

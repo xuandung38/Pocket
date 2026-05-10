@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { MessageCircle } from "lucide-react";
 import EmptyState from "@/components/ui/EmptyState";
@@ -55,16 +55,28 @@ export default function MessagesScreen({ className }) {
     };
   }, [socket, upsertConversation, addMessageWithUserV2]);
 
-  // Subscribe to messages of the active chat
+  // Keep a ref to the latest conversations list so we can read `with_user`
+  // inside the subscribe effect WITHOUT re-emitting on every list mutation.
+  const conversationsRef = useRef(conversations);
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
+
+  // Subscribe to messages of the active chat — fires only when the active
+  // chat (or socket) changes. Previously this re-emitted `get_messages_with_user`
+  // on every conversations-list mutation (incoming list updates, new messages,
+  // etc.), causing redundant socket traffic and server load.
   useEffect(() => {
     if (!socket || !activeChatId) return;
-    const conv = conversations.find((c) => c.uid === activeChatId);
+    const conv = conversationsRef.current.find(
+      (c) => c.uid === activeChatId,
+    );
     socket.emit("get_messages_with_user", {
       messageId: activeChatId,
       otherUserId: conv?.with_user,
       timestamp: null,
     });
-  }, [socket, activeChatId, conversations]);
+  }, [socket, activeChatId]);
 
   const sorted = useMemo(() => {
     return [...(conversations || [])].sort(
