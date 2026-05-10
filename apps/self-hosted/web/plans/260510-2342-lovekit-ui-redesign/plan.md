@@ -156,7 +156,7 @@ activate ck:chrome-devtools
 |----|-------|--------|--------|------------|
 | 01 | [Project scaffold + reuse copy + design tokens](./phase-01-design-tokens-scaffold.md) | 4h | completed | — |
 | 02 | [App shell + BottomTabBar + LoginScreen](./phase-02-navigation-shell.md) | 3h | completed | 01 |
-| 03 | [CameraScreen](./phase-03-camera-screen.md) | 5h | pending | 02 |
+| 03 | [CameraScreen](./phase-03-camera-screen.md) | 5h | completed | 02 |
 | 04 | [FeedScreen + MomentCard + Viewer + Reactions](./phase-04-feed-screen.md) | 6h | completed | 02 |
 | 05 | [MessagesScreen (list + chat detail)](./phase-05-messages-screen.md) | 5h | completed | 02 |
 | 06 | [ProfileScreen (streak + friends + rollcall)](./phase-06-profile-screen.md) | 4h | completed | 02 |
