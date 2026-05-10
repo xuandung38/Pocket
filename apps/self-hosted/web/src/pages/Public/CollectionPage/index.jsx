@@ -26,7 +26,7 @@ export default function CollectionPage() {
       ? collections
       : collections.filter((item) => item.category === selectedCategory);
 
-  // const currentOrigin = "https://locket-dio.com";
+  // const currentOrigin = "http://localhost:5173";
   const currentOrigin = window.location.origin;
 
   const currentVersion = collections.find(
@@ -89,11 +89,10 @@ export default function CollectionPage() {
               <button
                 key={category}
                 onClick={() => setSelectedCategory(category)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-                  selectedCategory === category
-                    ? "bg-primary text-primary-content shadow-md"
-                    : "bg-base-100 text-base-content/80 border border-base-300 hover:bg-base-200"
-                }`}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${selectedCategory === category
+                  ? "bg-primary text-primary-content shadow-md"
+                  : "bg-base-100 text-base-content/80 border border-base-300 hover:bg-base-200"
+                  }`}
               >
                 {category}
               </button>
@@ -169,11 +168,10 @@ export default function CollectionPage() {
                   {/* Actions */}
                   <div className="flex gap-2">
                     <button
-                      className={`flex-1 px-4 py-2.5 rounded-xl text-base font-semibold transition-all duration-300 transform hover:scale-105 ${
-                        item.active
-                          ? "bg-gradient-to-tr from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/30 hover:shadow-xl"
-                          : "bg-gray-100 text-gray-400 cursor-not-allowed"
-                      }`}
+                      className={`flex-1 px-4 py-2.5 rounded-xl text-base font-semibold transition-all duration-300 transform hover:scale-105 ${item.active
+                        ? "bg-gradient-to-tr from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/30 hover:shadow-xl"
+                        : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        }`}
                       onClick={() =>
                         item.active
                           ? window.open(item.url, "_blank")

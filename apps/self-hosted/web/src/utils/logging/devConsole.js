@@ -20,11 +20,11 @@ export function showDevWarning(title = "Dừng lại!", message = "") {
 
   console.log(
     "%cĐây là bảng console dành cho nhà phát triển. " +
-      "Nếu ai đó bảo bạn dán đoạn code vào đây, có thể tài khoản của bạn sẽ bị xâm nhập.",
+    "Nếu ai đó bảo bạn dán đoạn code vào đây, có thể tài khoản của bạn sẽ bị xâm nhập.",
     "color: #ff6f00; font-weight: bold; font-size: 13px;"
   );
   console.log(
-    "%c👉 Nếu bạn cần hỗ trợ chính thức, hãy truy cập: https://locket-dio.com/contact",
+    "%c👉 Nếu bạn cần hỗ trợ chính thức, hãy truy cập: http://localhost:5173/contact",
     "color: #00bcd4; font-weight: bold; font-size: 13px;"
   );
   console.log(

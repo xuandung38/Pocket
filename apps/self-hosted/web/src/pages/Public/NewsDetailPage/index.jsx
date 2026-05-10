@@ -20,7 +20,7 @@ export default function NewsDetailPage() {
   useEffect(() => {
     if (news?.title) {
       document.title = `${news.title} | Locket Dio - Đăng ảnh & Video lên Locket`;
-      const url = "https://locket-dio.com" + location.pathname;
+      const url = "http://localhost:5173" + location.pathname;
       const link =
         document.querySelector("link[rel='canonical']") ||
         document.head.appendChild(

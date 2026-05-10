@@ -68,6 +68,9 @@ export default defineConfig({
   server: {
     host: true,
   },
+  preview: {
+    allowedHosts: process.env.ALLOWED_HOSTS?.split(",").filter(Boolean) ?? [],
+  },
   plugins: [tailwindcss(), react(), VitePWA(manifestForPlugIn), visualizer()],
   resolve: {
     alias: {
