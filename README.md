@@ -10,7 +10,7 @@
 
 [![Phiên bản](https://img.shields.io/badge/phiên_bản-1.0.0-blue.svg?cacheSeconds=2592000)](https://github.com/doi2523/Client-Locket-Dio/releases)
 [![Giấy phép: MIT](https://img.shields.io/badge/Giấy_phép-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Demo trực tiếp](https://img.shields.io/badge/demo-trực_tiếp-green.svg)](https://locket-dio.com)
+[![Demo trực tiếp](https://img.shields.io/badge/demo-trực_tiếp-green.svg)](http://localhost:5173)
 [![PRs được chào đón](https://img.shields.io/badge/PRs-được_chào_đón-brightgreen.svg)](http://makeapullrequest.com)
 
 [![React](https://img.shields.io/badge/React-18.2+-61DAFB?logo=react&logoColor=white)](https://reactjs.org/)
@@ -18,7 +18,7 @@
 [![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-F7DF1E?logo=javascript&logoColor=black)](https://developer.mozilla.org/docs/Web/JavaScript)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.0+-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 
-[**🌐 Demo Trực Tiếp**](https://locket-dio.com) | [**📱 Repo Frontend**](https://github.com/doi2523/Client-Locket-Dio) | [**💬 Telegram**](https://t.me/ddevdio)
+[**🌐 Demo Trực Tiếp**](http://localhost:5173) | [**📱 Repo Frontend**](https://github.com/doi2523/Client-Locket-Dio) | [**💬 Telegram**](https://t.me/ddevdio)
 
 </div>
 
@@ -83,7 +83,7 @@
 
 <div align="center">
 
-[![Demo Trực Tiếp](https://img.shields.io/badge/🎯_Demo_Trực_Tiếp-Truy_Cập_Ngay-FF6B6B?style=for-the-badge)](https://locket-dio.com)
+[![Demo Trực Tiếp](https://img.shields.io/badge/🎯_Demo_Trực_Tiếp-Truy_Cập_Ngay-FF6B6B?style=for-the-badge)](http://localhost:5173)
 
 </div>
 
@@ -223,7 +223,7 @@ _Full Stack Developer_
 ### 📧 Thông Tin Liên Hệ
 
 - **Email**: doibncm2003@gmail.com
-- **Website**: [https://locket-dio.com](https://locket-dio.com)
+- **Website**: [http://localhost:5173](http://localhost:5173)
 - **Telegram**: [@ddevdio](https://t.me/ddevdio)
 - **GitHub**: [@doi2523](https://github.com/doi2523)
 
@@ -253,7 +253,7 @@ _Full Stack Developer_
  </picture>
 </a>
 
-**Được tạo với ❤️ bởi [Dio](https://github.com/doi2523) | © 2025 [Locket Dio](https://locket-dio.com) | Tất cả quyền được bảo lưu**
+**Được tạo với ❤️ bởi [Dio](https://github.com/doi2523) | © 2025 [Locket Dio](http://localhost:5173) | Tất cả quyền được bảo lưu**
 
 [![Về đầu trang](https://img.shields.io/badge/⬆️_Về_Đầu_Trang-Nhấn_Vào_Đây-blue?style=for-the-badge)](#-locket-dio)
 
