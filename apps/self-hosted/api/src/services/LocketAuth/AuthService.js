@@ -14,7 +14,8 @@ const login = async (email, password) => {
   try {
     const firebaseAuthApi = createGoogleInstance("auth");
 
-    const response = await firebaseAuthApi.post("verifyPassword", body);
+    // accounts:signInWithPassword replaces deprecated v3 verifyPassword
+    const response = await firebaseAuthApi.post("accounts:signInWithPassword", body);
 
     if (!response.data) {
       throw new Error(`Login failed: ${response.statusText}`);
@@ -25,7 +26,14 @@ const login = async (email, password) => {
     logInfo("login Locket", "End");
     return data;
   } catch (error) {
-    logError("login Locket", error.message);
+    const firebaseMsg = error.response?.data?.error?.message;
+    const status = error.response?.status;
+    logError("login Locket Error", firebaseMsg || error.message);
+    if (firebaseMsg) {
+      const err = new Error(firebaseMsg);
+      err.status = status;
+      throw err;
+    }
     throw error;
   }
 };

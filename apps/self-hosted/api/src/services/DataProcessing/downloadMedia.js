@@ -50,15 +50,25 @@ const downloadMediaOnStorage = async (
     response.data.pipe(writer);
 
     return new Promise((resolve, reject) => {
+      // Guard against double-rejection if both streams error
+      let settled = false;
+      const rejectOnce = (err) => {
+        if (!settled) { settled = true; reject(err); }
+      };
+
+      response.data.on("error", (err) =>
+        rejectOnce(new Error("Lỗi stream nguồn: " + err.message))
+      );
+      writer.on("error", (err) =>
+        rejectOnce(new Error("Lỗi ghi file: " + err.message))
+      );
       writer.on("finish", () => {
         fs.readFile(downloadPath, (err, data) => {
-          if (err) return reject(new Error("Lỗi đọc file tạm: " + err.message));
-          resolve({ buffer: data, path: downloadPath }); // Trả về cả buffer và đường dẫn file
+          if (err) return rejectOnce(new Error("Lỗi đọc file tạm: " + err.message));
+          settled = true;
+          resolve({ buffer: data, path: downloadPath });
         });
       });
-      writer.on("error", (err) =>
-        reject(new Error("Lỗi ghi file: " + err.message))
-      );
     });
   } catch (err) {
     logError(

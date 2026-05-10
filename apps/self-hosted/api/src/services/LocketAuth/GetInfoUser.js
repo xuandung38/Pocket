@@ -3,9 +3,8 @@ const { instanceFirestore, instanceFirebaseV2 } = require("../../libs");
 // Lấy thông tin người dùng
 const getUserInfoV2 = async (idToken, localId) => {
   try {
-    const authResponse = await instanceFirebaseV2.post("getAccountInfo", {
-      idToken,
-    });
+    // accounts:lookup replaces deprecated v3 getAccountInfo
+    const authResponse = await instanceFirebaseV2.post("accounts:lookup", { idToken });
     const userData = authResponse.data?.users?.[0];
     if (!userData) throw new Error("Không tìm thấy user trong Firebase Auth.");
     // console.log(userData);
