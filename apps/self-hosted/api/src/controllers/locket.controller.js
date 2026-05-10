@@ -73,16 +73,21 @@ class LocketController {
   async getMoments(req, res, next) {
     try {
       const { idToken, localId } = req.user;
+      const { timestamp, friendId, limit, syncToken } = req.body;
 
-      const data = await postServices.getLocketMoments(idToken, localId);
-      return res
-        .status(200)
-        .json({
-          data: data.moments,
-          nextPageToken: data.nextPageToken,
-          success: true,
-          message: "ok",
-        });
+      const data = await postServices.getLocketMomentsFromAPI(idToken, localId, {
+        timestamp,
+        friendId,
+        limit,
+        syncToken,
+      });
+
+      return res.status(200).json({
+        data: data.moments,
+        syncToken: data.syncToken,
+        success: true,
+        message: "ok",
+      });
     } catch (error) {
       next(error);
     }
@@ -123,6 +128,8 @@ class LocketController {
       const { messageId } = req.body;
       if (!messageId) return res.status(400).json({ success: false, message: "Thiếu messageId" });
       const data = await chatServices.getMessagesWithUser(idToken, localId, messageId);
+      console.log("DATA: ", data);
+
       return res.status(200).json({
         data: data.messages,
         nextPageToken: data.nextPageToken,
@@ -274,6 +281,18 @@ class LocketController {
     }
   }
 
+  async deleteMoment(req, res, next) {
+    try {
+      const { idToken } = req.user;
+      const { momentUid } = req.body;
+      if (!momentUid) return res.status(400).json({ success: false, message: "Thiếu momentUid" });
+      await postServices.deleteLocketMoment(idToken, momentUid);
+      return res.status(200).json({ success: true, message: "ok" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   //Function upload với thông tin media là url
   async uploadMediaV2(req, res, next) {
     let mediaPath;
@@ -378,7 +397,7 @@ class LocketController {
         });
       }
 
-      await processServices.deleteFileFromStorageR2(mediaPath).catch(() => {});
+      await processServices.deleteFileFromStorageR2(mediaPath).catch(() => { });
 
       logInfo("uploadMediaV2", "End - Success");
 
@@ -394,7 +413,7 @@ class LocketController {
       if (mediaPath) {
         try {
           deleteTempFile(mediaPath);
-        } catch {}
+        } catch { }
       }
     }
   }
