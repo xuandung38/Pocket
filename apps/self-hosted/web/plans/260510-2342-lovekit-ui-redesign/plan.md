@@ -157,10 +157,11 @@ activate ck:chrome-devtools
 | 01 | [Project scaffold + reuse copy + design tokens](./phase-01-design-tokens-scaffold.md) | 4h | completed | — |
 | 02 | [App shell + BottomTabBar + LoginScreen](./phase-02-navigation-shell.md) | 3h | completed | 01 |
 | 03 | [CameraScreen](./phase-03-camera-screen.md) | 5h | pending | 02 |
-| 04 | [FeedScreen + MomentCard + Viewer + Reactions](./phase-04-feed-screen.md) | 6h | pending | 02 |
-| 05 | [MessagesScreen (list + chat detail)](./phase-05-messages-screen.md) | 5h | pending | 02 |
+| 04 | [FeedScreen + MomentCard + Viewer + Reactions](./phase-04-feed-screen.md) | 6h | completed | 02 |
+| 05 | [MessagesScreen (list + chat detail)](./phase-05-messages-screen.md) | 5h | completed | 02 |
 | 06 | [ProfileScreen (streak + friends + rollcall)](./phase-06-profile-screen.md) | 4h | completed | 02 |
 | 07 | [Empty states + skeletons + polish](./phase-07-empty-states-polish.md) | 2h | pending | 03,04,05,06 |
+| 08 | [Docker — lovekit service on port 5175](./phase-08-docker.md) | 1h | pending | 07 |
 
 Phases 03–06 parallelizable after 02 lands.
 
@@ -186,5 +187,5 @@ Phases 03–06 parallelizable after 02 lands.
 
 ## Open Questions
 
-- Should lovekit be served on a different port or same Docker compose as web app?
+- ~~Should lovekit be served on a different port or same Docker compose as web app?~~ → Resolved: Phase 08, port 5175, same docker-compose.yml
 - Rollcall in Phase 06 MVP or defer to P3?
