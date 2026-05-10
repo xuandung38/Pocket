@@ -128,29 +128,32 @@ exports.videoPostPayloadIcon = ({ videoUrl, thumbnailUrl, optionsData }) => {
 };
 
 exports.videoPostPayloadWeather = ({ videoUrl, thumbnailUrl, optionsData }) => {
-  const { caption, text_color, weatherData } = optionsData;
+  const { text, caption, text_color, icon, background, payload } = optionsData;
   const data = createBaseVideoPayload({ videoUrl, thumbnailUrl, optionsData });
 
-  const wkCondition = weatherData?.wk_condition || "cloudy";
+  const altText = text || caption || "";
+  const wkCondition = payload?.wk_condition || "cloudy";
   const theme = WEATHER_THEME[wkCondition] || WEATHER_THEME.cloudy;
+  const resolvedIcon = icon?.data ? icon : { type: "sf_symbol", color: text_color || "#FFFFFF", data: theme.sf };
+  const resolvedColors = background?.colors?.length ? background.colors : theme.colors;
 
   data.overlays.push({
     data: {
       max_lines: { "@type": "type.googleapis.com/google.protobuf.Int64Value", value: "1" },
       payload: {
-        temperature: weatherData?.temperature ?? 0,
-        cloud_cover: weatherData?.cloud_cover ?? 0,
-        is_daylight: weatherData?.is_daylight ?? true,
+        temperature: payload?.temperature ?? 0,
+        cloud_cover: payload?.cloud_cover ?? 0,
+        is_daylight: payload?.is_daylight ?? true,
         wk_condition: wkCondition,
       },
-      text: caption,
-      background: { colors: theme.colors },
+      text: altText,
+      background: { colors: resolvedColors },
       type: "weather",
-      icon: { type: "sf_symbol", color: text_color || "#FFFFFF", data: theme.sf },
+      icon: resolvedIcon,
       text_color: text_color || "#FFFFFF",
     },
     overlay_id: "caption:weather",
-    alt_text: caption,
+    alt_text: altText,
     overlay_type: "caption",
   });
 
