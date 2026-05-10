@@ -7,6 +7,7 @@ import {
   getAllMoments,
   getMomentsByUser,
 } from "@/cache/momentDB";
+import { SonnerError } from "@/components/ui/SonnerToast";
 
 const { initialVisible, loadMoreLimit } = MOMENTS_CONFIG;
 
@@ -116,6 +117,7 @@ export const useMomentsStoreV2 = create((set, get) => ({
       }
     } catch (err) {
       console.error("❌ fetchMoments error:", err);
+      SonnerError("Không tải được moments", err?.message || "");
     } finally {
       set((state) => {
         const bucket = state.momentsByUser[key];

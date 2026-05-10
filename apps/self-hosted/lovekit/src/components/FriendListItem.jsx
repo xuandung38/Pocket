@@ -1,34 +1,6 @@
 import clsx from "clsx";
 import { formatTimeAgo } from "@/utils/Formats/formatTimeAgo";
-
-// Inline minimal avatar — used as fallback if FriendAvatar (dev-4) is unavailable.
-function InlineAvatar({ friend, size = 44 }) {
-  const src = friend?.profile_picture_url;
-  const initials =
-    `${friend?.first_name?.[0] ?? ""}${friend?.last_name?.[0] ?? ""}`.toUpperCase() ||
-    "?";
-  return (
-    <div
-      className="rounded-full bg-base-200 text-primary font-semibold flex items-center justify-center overflow-hidden shrink-0 ring-2 ring-primary/20"
-      style={{ width: size, height: size }}
-      aria-hidden="true"
-    >
-      {src ? (
-        <img
-          src={src}
-          alt=""
-          className="w-full h-full object-cover"
-          loading="lazy"
-          onError={(e) => {
-            e.currentTarget.style.display = "none";
-          }}
-        />
-      ) : (
-        <span className="text-sm">{initials}</span>
-      )}
-    </div>
-  );
-}
+import FriendAvatar from "@/components/FriendAvatar";
 
 export default function FriendListItem({
   friend,
@@ -58,7 +30,12 @@ export default function FriendListItem({
         className,
       )}
     >
-      <InlineAvatar friend={friend} />
+      <FriendAvatar
+        src={friend?.profile_picture_url}
+        name={name}
+        size="md"
+        unread={rollcallPending}
+      />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-base-content truncate">
           {name}

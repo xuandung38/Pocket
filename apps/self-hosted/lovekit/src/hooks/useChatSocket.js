@@ -1,4 +1,6 @@
 // hooks/useChatSocket.js
+// Deprecated: use SocketContext directly (see MessagesScreen.jsx).
+// Retained for backward-compat only — do not consume in new code.
 import { useEffect, useState, useRef } from "react";
 import { io } from "socket.io-client";
 import { upsertConversations } from "@/cache/chatsDB";

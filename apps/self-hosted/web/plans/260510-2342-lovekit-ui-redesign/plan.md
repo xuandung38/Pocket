@@ -1,7 +1,7 @@
 ---
 title: "Lovekit — Standalone Mobile PWA"
 description: "Brand-new Vite + React app at apps/self-hosted/lovekit/. Bottom-tab navigation, warm orange-amber identity. Zero modifications to the existing web app."
-status: in-progress
+status: completed
 priority: P2
 effort: 28h
 branch: feat/fix-selfhost
@@ -160,7 +160,7 @@ activate ck:chrome-devtools
 | 04 | [FeedScreen + MomentCard + Viewer + Reactions](./phase-04-feed-screen.md) | 6h | completed | 02 |
 | 05 | [MessagesScreen (list + chat detail)](./phase-05-messages-screen.md) | 5h | completed | 02 |
 | 06 | [ProfileScreen (streak + friends + rollcall)](./phase-06-profile-screen.md) | 4h | completed | 02 |
-| 07 | [Empty states + skeletons + polish](./phase-07-empty-states-polish.md) | 2h | pending | 03,04,05,06 |
+| 07 | [Empty states + skeletons + polish](./phase-07-empty-states-polish.md) | 2h | completed | 03,04,05,06 |
 | 08 | [Docker — lovekit service on port 5175](./phase-08-docker.md) | 1h | completed | 07 |
 
 Phases 03–06 parallelizable after 02 lands.

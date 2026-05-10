@@ -37,6 +37,25 @@ function Feed({ count = 3, className }) {
   );
 }
 
+function List({ count = 4, className }) {
+  return (
+    <div className={clsx("flex flex-col gap-2", className)}>
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={i}
+          className="flex items-center gap-3 px-2 py-3 rounded-2xl"
+        >
+          <Avatar />
+          <div className="flex-1 space-y-2">
+            <Line className="w-1/3 h-3" />
+            <Line className="w-2/3 h-2 opacity-60" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function LoadingSkeleton({
   variant = "card",
   count,
@@ -49,6 +68,8 @@ export default function LoadingSkeleton({
       return <Avatar className={className} />;
     case "feed":
       return <Feed count={count} className={className} />;
+    case "list":
+      return <List count={count} className={className} />;
     case "card":
     default:
       return <Card className={className} />;

@@ -9,6 +9,7 @@ import {
   upsertConversations,
 } from "@/cache/chatsDB";
 import { MESSAGES_CONFIG } from "@/config";
+import { SonnerError } from "@/components/ui/SonnerToast";
 
 const { initialVisible, loadMoreLimit } = MESSAGES_CONFIG;
 
@@ -42,6 +43,7 @@ export const useMessagesStore = create((set, get) => ({
       }
     } catch (err) {
       console.error("Fetch messages error:", err);
+      SonnerError("Không tải được tin nhắn", err?.message || "");
     } finally {
       set({ loading: false });
     }

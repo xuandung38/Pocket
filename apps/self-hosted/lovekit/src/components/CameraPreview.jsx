@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import clsx from "clsx";
 import { CameraOff } from "lucide-react";
+import EmptyState from "@/components/ui/EmptyState";
 
 const CameraPreview = forwardRef(function CameraPreview(
   { active = true, facingMode = "user", className },
@@ -79,12 +80,15 @@ const CameraPreview = forwardRef(function CameraPreview(
     return (
       <div
         className={clsx(
-          "absolute inset-0 flex flex-col items-center justify-center text-center px-6 bg-base-200 text-base-content/70",
+          "absolute inset-0 flex items-center justify-center bg-base-200",
           className,
         )}
       >
-        <CameraOff className="size-10 mb-3 text-primary/70" strokeWidth={1.75} />
-        <p className="text-sm font-medium max-w-xs">{error}</p>
+        <EmptyState
+          icon={CameraOff}
+          title="Camera access denied"
+          subtitle={error}
+        />
       </div>
     );
   }

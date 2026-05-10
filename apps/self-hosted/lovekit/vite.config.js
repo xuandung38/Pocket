@@ -11,7 +11,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.ico"],
+      includeAssets: ["favicon.ico", "icons/icon-192.png", "icons/icon-512.png"],
       manifest: {
         name: "Lovekit",
         short_name: "Lovekit",
@@ -22,13 +22,38 @@ export default defineConfig({
         scope: "/",
         start_url: "/",
         orientation: "portrait",
-        icons: [],
+        icons: [
+          {
+            src: "/icons/icon-192.png",
+            sizes: "192x192",
+            type: "image/png",
+            purpose: "any maskable",
+          },
+          {
+            src: "/icons/icon-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "any maskable",
+          },
+        ],
       },
     }),
   ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ["react", "react-dom"],
+          swiper: ["swiper", "swiper/react", "swiper/modules"],
+          socket: ["socket.io-client"],
+          icons: ["lucide-react"],
+        },
+      },
     },
   },
 });

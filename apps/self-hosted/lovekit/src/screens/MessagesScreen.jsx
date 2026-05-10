@@ -95,20 +95,7 @@ export default function MessagesScreen({ className }) {
 
       <div className="px-2 py-2">
         {loading && sorted.length === 0 ? (
-          <div className="flex flex-col gap-2 px-2">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-3 px-2 py-3 rounded-2xl"
-              >
-                <LoadingSkeleton variant="avatar" />
-                <div className="flex-1 space-y-2">
-                  <LoadingSkeleton variant="line" className="w-1/3" />
-                  <LoadingSkeleton variant="line" className="w-2/3 opacity-60" />
-                </div>
-              </div>
-            ))}
-          </div>
+          <LoadingSkeleton variant="list" count={5} className="px-2" />
         ) : sorted.length === 0 ? (
           <EmptyState
             icon={MessageCircle}
