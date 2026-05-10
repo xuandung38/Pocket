@@ -105,6 +105,71 @@ const uploadImageToFirebaseStorage = async (userId, idToken, image) => {
 };
 //#endregion
 
+/**
+ * Khởi tạo Firebase resumable upload session cho ảnh.
+ * Trả về uploadUrl (client dùng để PUT trực tiếp) và getUrl (để lấy download token).
+ */
+const initImageUploadSession = async (userId, idToken, fileSize) => {
+  const imageName = `${Date.now()}_vtd182.webp`;
+  const url = `https://firebasestorage.googleapis.com/v0/b/locket-img/o/users%2F${userId}%2Fmoments%2Fthumbnails%2F${imageName}?uploadType=resumable&name=users%2F${userId}%2Fmoments%2Fthumbnails%2F${imageName}`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json; charset=UTF-8",
+      authorization: `Bearer ${idToken}`,
+      "x-goog-upload-protocol": "resumable",
+      accept: "*/*",
+      "x-goog-upload-command": "start",
+      "x-goog-upload-content-length": `${fileSize}`,
+      "accept-language": "vi-VN,vi;q=0.9",
+      "x-firebase-storage-version": "ios/10.13.0",
+      "user-agent": "com.locket.Locket/1.43.1 iPhone/17.3 hw/iPhone15_3 (GTMSUF/1)",
+      "x-goog-upload-content-type": "image/webp",
+      "x-firebase-gmpid": "1:641029076083:ios:cc8eb46290d69b234fa609",
+    },
+    body: JSON.stringify({
+      name: `users/${userId}/moments/thumbnails/${imageName}`,
+      contentType: "image/*",
+      bucket: "",
+      metadata: { creator: userId, visibility: "private" },
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Firebase init upload failed: ${response.statusText}`);
+  }
+
+  const uploadUrl = response.headers.get("X-Goog-Upload-URL");
+  if (!uploadUrl) throw new Error("Firebase did not return upload URL");
+
+  const getUrl = `https://firebasestorage.googleapis.com/v0/b/locket-img/o/users%2F${userId}%2Fmoments%2Fthumbnails%2F${imageName}`;
+
+  return { uploadUrl, getUrl };
+};
+
+/**
+ * Lấy download URL từ Firebase sau khi client đã upload xong.
+ */
+const getFirebaseDownloadUrl = async (getUrl, idToken) => {
+  const response = await fetch(getUrl, {
+    method: "GET",
+    headers: {
+      "content-type": "application/json; charset=UTF-8",
+      authorization: `Bearer ${idToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to get download token: ${response.statusText}`);
+  }
+
+  const downloadToken = (await response.json()).downloadTokens;
+  return `${getUrl}?alt=media&token=${downloadToken}`;
+};
+
 module.exports = {
   uploadImageToFirebaseStorage,
+  initImageUploadSession,
+  getFirebaseDownloadUrl,
 };

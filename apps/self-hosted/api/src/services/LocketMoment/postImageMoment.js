@@ -155,7 +155,53 @@ const postImageToLocketV2 = async ({
   }
 };
 
+/**
+ * Post ảnh lên Locket API với imageUrl đã có sẵn (client đã upload trực tiếp lên Firebase).
+ * Không cần download/upload lại — chỉ tạo payload và gọi Locket API.
+ */
+const postImageToLocketDirect = async ({ idToken, imageUrl, optionsData }) => {
+  try {
+    logInfo("postImageDirect", "Start");
+
+    const { type } = optionsData;
+    let postData;
+
+    switch (type) {
+      case "default":
+        postData = creImagePayload.imagePostPayloadDefault({ imageUrl, optionsData });
+        break;
+      case "decorative":
+        postData = creImagePayload.imagePostPayloadDecorative({ imageUrl, optionsData });
+        break;
+      case "image_icon":
+      case "image_gif":
+      case "caption_icon":
+      case "caption_gif":
+        postData = creImagePayload.imagePostPayloadIcon({ imageUrl, optionsData });
+        break;
+      default:
+        postData = creImagePayload.imagePostPayloadDecorative({ imageUrl, optionsData });
+        break;
+    }
+
+    const postResponse = await instanceLocketV2.post("postMomentV2", postData, {
+      meta: { idToken },
+    });
+
+    logInfo("postImageDirect", "End");
+    return postResponse.data;
+  } catch (error) {
+    const message =
+      error.response?.data?.error ||
+      error.response?.statusText ||
+      error.message;
+    logError("postImageDirect", message);
+    throw new Error(message);
+  }
+};
+
 module.exports = {
   postImageToLocket,
   postImageToLocketV2,
+  postImageToLocketDirect,
 };

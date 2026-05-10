@@ -5,6 +5,10 @@ const {
   processServices,
   chatServices,
 } = require("../services");
+const {
+  initImageUploadSession,
+  getFirebaseDownloadUrl,
+} = require("../services/FirestorageService");
 const { formatFileSize } = require("../utils/formatFileSize");
 const {
   logWarning,
@@ -207,6 +211,40 @@ class LocketController {
     }
   }
 
+  // Khởi tạo Firebase upload session — client sẽ upload trực tiếp lên Firebase
+  async initUpload(req, res, next) {
+    try {
+      const { idToken, localId } = req.user;
+      const { fileSize } = req.body;
+
+      if (!fileSize) {
+        return res.status(400).json({ error: "Missing fileSize" });
+      }
+
+      const result = await initImageUploadSession(localId, idToken, fileSize);
+      return res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Lấy download URL sau khi client đã upload xong
+  async finalizeUpload(req, res, next) {
+    try {
+      const { idToken } = req.user;
+      const { getUrl } = req.body;
+
+      if (!getUrl) {
+        return res.status(400).json({ error: "Missing getUrl" });
+      }
+
+      const downloadUrl = await getFirebaseDownloadUrl(getUrl, idToken);
+      return res.status(200).json({ downloadUrl });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   //Function upload với thông tin media là url
   async uploadMediaV2(req, res, next) {
     let mediaPath;
@@ -216,6 +254,22 @@ class LocketController {
 
       const optionsData = options ?? optionsDataRaw;
       const { idToken, localId } = req.user;
+
+      // Fast path: client đã upload thẳng lên Firebase, chỉ cần post lên Locket
+      if (mediaInfo?.imageUrl) {
+        logInfo("uploadMediaV2", "Direct Firebase URL — skipping download/upload");
+        const result = await postServices.postImageToLocketDirect({
+          userId: localId,
+          idToken,
+          imageUrl: mediaInfo.imageUrl,
+          optionsData,
+        });
+        return res.status(200).json({
+          success: true,
+          message: "Upload media successfully",
+          data: result?.result?.data,
+        });
+      }
 
       const { type, url, name, size, path } = mediaInfo;
 

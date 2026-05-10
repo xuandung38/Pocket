@@ -16,6 +16,10 @@ router.post("/getAllFriendsV2", verifyIdToken, locketController.getAllFriends);
 
 router.post("/getInfoUser", verifyIdToken, locketController.getInfoLocket);
 
+// Client upload trực tiếp lên Firebase — không qua VPS
+router.post("/initUpload", verifyIdToken, locketController.initUpload);
+router.post("/finalizeUpload", verifyIdToken, locketController.finalizeUpload);
+
 //API bản V1 yêu cầu tải trực tiếp file trong request
 router.post("/postMomentV1", verifyIdToken, saveUploadFile, locketController.uploadMediaV1);
 
