@@ -5,6 +5,7 @@ const { firebase } = require("../config/app.config")
 const instanceAppcheck = axios.create({
   baseURL: firebase.apiBase.appCheck,
   timeout: 30000,
+  adapter: "fetch",
   headers: {
     "Content-Type": "application/json",
     Accept: "*/*",

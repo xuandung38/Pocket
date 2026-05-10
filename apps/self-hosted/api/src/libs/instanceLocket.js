@@ -1,9 +1,5 @@
 const axios = require("axios");
-const https = require("https");
 const serverConfig = require("../config/app.config");
-
-// Disable keep-alive to prevent ECONNRESET when remote closes idle connections
-const httpsAgent = new https.Agent({ keepAlive: false });
 
 const loginHeader = {
   "Content-Type": "application/json",
@@ -23,7 +19,7 @@ const BASE_URL_LOCKET = serverConfig.function.locketApi;
 const instanceLocketV2 = axios.create({
   baseURL: BASE_URL_LOCKET,
   timeout: 30000,
-  httpsAgent,
+  adapter: "fetch",
   headers: {
     ...loginHeader,
     "Content-Type": "application/json",
