@@ -10,6 +10,7 @@ import SettingsSheet from "@/components/SettingsSheet";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useFriendStore } from "@/stores/useFriendStore";
 import { useStreakStore } from "@/stores/useStreakStore";
+import { useApp } from "@/context/AppContext";
 
 // NOTE: App.jsx must pass `onLogout={() => { setAuthed(false); localStorage.clear(); }}`
 // (or equivalent) to this screen so the SettingsSheet logout returns to LoginScreen.
@@ -29,6 +30,7 @@ export default function ProfileScreen({ className, onLogout }) {
   const syncStreak = useStreakStore((s) => s.syncStreak);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const { setFriendsTabOpen } = useApp().navigation;
 
   useEffect(() => {
     if (!user) {
@@ -90,6 +92,14 @@ export default function ProfileScreen({ className, onLogout }) {
               <p className="text-sm text-base-content/60 truncate">{email}</p>
             )}
           </div>
+          <button
+            type="button"
+            onClick={() => setFriendsTabOpen(true)}
+            aria-label="Thêm bạn"
+            className="size-10 rounded-full bg-base-200/70 hover:bg-base-200 flex items-center justify-center text-base-content/70 active:scale-95 transition shrink-0"
+          >
+            <UserPlus className="size-5" />
+          </button>
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}
