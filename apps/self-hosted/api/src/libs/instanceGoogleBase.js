@@ -10,9 +10,12 @@ const createGoogleInstance = (service) => {
     throw new Error(`❌ Unknown Firebase service: ${service}`);
   }
 
+  // Use fetch adapter — follow-redirects (http adapter) causes ECONNRESET in Docker
+  // for Google APIs even though raw https.request works fine (Node.js v20+)
   return axios.create({
     baseURL,
     timeout: 30000,
+    adapter: "fetch",
     params: {
       key: firebase.apiKey,
     },
