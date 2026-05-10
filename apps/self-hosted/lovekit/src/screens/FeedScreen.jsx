@@ -4,7 +4,7 @@ import { Sparkles } from "lucide-react";
 import EmptyState from "@/components/ui/EmptyState";
 import LoadingSkeleton from "@/components/ui/LoadingSkeleton";
 import FriendAvatar from "@/components/FriendAvatar";
-import EmojiReactionBar from "@/components/EmojiReactionBar";
+import MomentSlideActions from "@/components/MomentSlideActions";
 import { formatTimeAgo } from "@/utils";
 import {
   useAuthStore,
@@ -29,6 +29,7 @@ function MomentSlide({ moment, friend, isOwn }) {
   const avatar = friend?.profilePic ?? friend?.profile_picture_url;
   const caption = moment?.caption;
   const when = moment?.date || moment?.createTime;
+  const ownerUid = moment?.user ?? moment?.userUid ?? moment?.owner;
 
   // Per-slide video ref + IntersectionObserver: only the visible slide plays.
   // Prevents all <video> elements from autoplaying simultaneously (perf).
@@ -111,16 +112,7 @@ function MomentSlide({ moment, friend, isOwn }) {
         </div>
       )}
 
-      <div
-        className="absolute left-0 right-0 bottom-0 px-4"
-        style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}
-      >
-        <EmojiReactionBar
-          momentId={moment?.id}
-          size="lg"
-          className="bg-white/15 backdrop-blur-md"
-        />
-      </div>
+      <MomentSlideActions momentId={moment?.id} ownerUid={ownerUid} />
     </div>
   );
 }

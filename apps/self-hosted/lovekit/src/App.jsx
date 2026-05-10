@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { Toaster } from "sonner";
 import { SocketProvider } from "@/context/SocketContext";
+import { AppProvider } from "@/context/AppContext";
 import LoginScreen from "@/screens/LoginScreen";
 import CameraScreen from "@/screens/CameraScreen";
 import FeedScreen from "@/screens/FeedScreen";
 import MessagesScreen from "@/screens/MessagesScreen";
 import ProfileScreen from "@/screens/ProfileScreen";
+import CropImageStudio from "@/components/CropImageStudio";
+import FriendsSheet from "@/components/FriendsSheet";
+import EmojiStudio from "@/components/EmojiStudio";
+import OptionMoment from "@/components/OptionMoment";
 import { useSwipeNav } from "@/hooks/useSwipeNav";
 import { useAuthStore } from "@/stores";
 
@@ -96,35 +101,42 @@ export default function App() {
   }
 
   return (
-    <div
-      data-theme="lovekit"
-      className="h-[100dvh] bg-base-100 text-base-content overflow-hidden"
-    >
-      <SocketProvider>
-        <main
-          className="relative h-full overflow-hidden"
-          // "manipulation" allows native pan (children's pan-x/pan-y work) and pinch,
-          // disables double-tap-zoom. JS swipe nav still fires via touchstart/touchend.
-          // Previously "pan-y" blocked horizontal scrollers (e.g. FriendMomentRow).
-          style={{ touchAction: "manipulation" }}
-          onTouchStart={onTouchStart}
-          onTouchEnd={onTouchEnd}
-        >
-          <div style={screenStyle("camera", navState)}>
-            <CameraScreen isActive={navState === "camera"} />
-          </div>
-          <div style={screenStyle("feed", navState)}>
-            <FeedScreen onBack={handleBackToCamera} />
-          </div>
-          <div style={screenStyle("messages", navState)}>
-            <MessagesScreen onBack={handleBackToCamera} />
-          </div>
-          <div style={screenStyle("profile", navState)}>
-            <ProfileScreen onBack={handleBackToCamera} onLogout={handleLogout} />
-          </div>
-        </main>
-      </SocketProvider>
-      <Toaster position="top-center" richColors />
-    </div>
+    <AppProvider>
+      <div
+        data-theme="lovekit"
+        className="h-[100dvh] bg-base-100 text-base-content overflow-hidden"
+      >
+        <SocketProvider>
+          <main
+            className="relative h-full overflow-hidden"
+            // "manipulation" allows native pan (children's pan-x/pan-y work) and pinch,
+            // disables double-tap-zoom. JS swipe nav still fires via touchstart/touchend.
+            // Previously "pan-y" blocked horizontal scrollers (e.g. FriendMomentRow).
+            style={{ touchAction: "manipulation" }}
+            onTouchStart={onTouchStart}
+            onTouchEnd={onTouchEnd}
+          >
+            <div style={screenStyle("camera", navState)}>
+              <CameraScreen isActive={navState === "camera"} />
+            </div>
+            <div style={screenStyle("feed", navState)}>
+              <FeedScreen onBack={handleBackToCamera} />
+            </div>
+            <div style={screenStyle("messages", navState)}>
+              <MessagesScreen onBack={handleBackToCamera} />
+            </div>
+            <div style={screenStyle("profile", navState)}>
+              <ProfileScreen onBack={handleBackToCamera} onLogout={handleLogout} />
+            </div>
+          </main>
+        </SocketProvider>
+        <Toaster position="top-center" richColors />
+        {/* Overlay modals — self-contained, render null when closed */}
+        <CropImageStudio />
+        <FriendsSheet />
+        <EmojiStudio />
+        <OptionMoment />
+      </div>
+    </AppProvider>
   );
 }
