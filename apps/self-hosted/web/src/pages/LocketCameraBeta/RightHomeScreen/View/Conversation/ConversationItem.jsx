@@ -56,9 +56,7 @@ export const ConversationItem = ({ msg, onSelect }) => {
             isUnread ? "text-black" : "text-gray-500 opacity-60"
           }`}
         >
-          {msg.latestMessage?.replyMoment
-            ? "Đã trả lời Locket của bạn!"
-            : msg.latestMessage?.body || ""}
+          {msg.latestMessage?.body || ""}
         </p>
       </div>
 

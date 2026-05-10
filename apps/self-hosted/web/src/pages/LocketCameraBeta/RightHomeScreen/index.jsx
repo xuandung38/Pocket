@@ -54,23 +54,23 @@ const RightHomeScreen = ({ setIsHomeOpen }) => {
 
   // ================= Socket init =================
   useEffect(() => {
-    if (isHomeOpen || !socket) return;
+    if (!socket) return;
 
     const handler = handleListMessage(upsertConversation);
 
     socket.on("new_on_list_message", handler);
 
     return () => {
-      socket.off("new_on_list_message", handler); // gỡ đúng handler
+      socket.off("new_on_list_message", handler);
     };
-  }, [socket]); // << chỉ theo socket, không theo idToken
+  }, [socket]);
 
-  // emit tách riêng
+  // emit khi panel mở VÀ socket sẵn sàng
   useEffect(() => {
-    if (isHomeOpen || !idToken || !socket) return;
+    if (!isHomeOpen || !idToken || !socket) return;
 
-    socket.emit("get_list_message", { timestamp: null, token: idToken });
-  }, [idToken, socket]);
+    socket.emit("get_list_message");
+  }, [isHomeOpen, idToken, socket]);
   // ================= Socket listener cho selectedChat =================
   useEffect(() => {
     if (!socket || !selectedChat?.uid) return;
@@ -79,6 +79,7 @@ const RightHomeScreen = ({ setIsHomeOpen }) => {
 
     socket.emit("get_messages_with_user", {
       messageId: selectedChat.uid,
+      otherUserId: selectedChat.with_user,
       timestamp: null,
       token: idToken,
     });

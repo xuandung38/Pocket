@@ -12,21 +12,21 @@ const ChatMessageItem = ({ msg, selectedChat }) => {
       {/* Nội dung */}
       <div className="chat-bubble relative">
         {/* Reply */}
-        {msg.reply_moment && (
-          <div className="text-sm italic opacity-70">↪ {msg.reply_moment}</div>
+        {msg.replyMoment && (
+          <div className="text-sm italic opacity-70">↪ {msg.replyMoment}</div>
         )}
 
         {/* Ảnh thumbnail */}
-        {msg.thumbnail_url && (
+        {msg.thumbnailUrl && (
           <img
-            src={msg.thumbnail_url}
+            src={msg.thumbnailUrl}
             alt="thumbnail"
             className="w-32 h-32 object-cover rounded-lg my-1"
           />
         )}
 
         {/* Text */}
-        {msg.text}
+        {msg.body}
 
         {/* Reactions */}
         {msg.reactions && msg.reactions.length > 0 && (
@@ -42,7 +42,7 @@ const ChatMessageItem = ({ msg, selectedChat }) => {
 
       {/* Thời gian */}
       <div className="chat-footer opacity-50 text-xs">
-        {new Date(Number(msg.create_time) * 1000).toLocaleTimeString([], {
+        {new Date(msg.createdAt * 1000).toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
         })}
@@ -59,7 +59,7 @@ const ChatDetail = ({ selectedChat, messages, setSelectedChat, isLoading }) => {
   // Sort tin nhắn theo thời gian tăng dần
   const sortedMessages = useMemo(() => {
     return [...messages].sort(
-      (a, b) => Number(a.create_time) - Number(b.create_time)
+      (a, b) => Number(a.createdAt) - Number(b.createdAt)
     );
   }, [messages]);
 
