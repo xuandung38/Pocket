@@ -1,12 +1,12 @@
 const { instanceFirestore } = require("../../libs");
 
 const getMessagesWithUser = async (idToken, userId, conversationId, pageToken, limit = 30) => {
-  const params = { pageSize: limit, orderBy: "create_time desc" };
+  const params = { pageSize: limit, orderBy: "created_at desc" };
   if (pageToken) params.pageToken = pageToken;
 
   try {
     const response = await instanceFirestore.get(
-      `/(default)/documents/users/${userId}/conversations/${conversationId}/messages`,
+      `/(default)/documents/conversations/${conversationId}/messages`,
       { params, meta: { idToken } },
     );
     const documents = response.data.documents || [];
