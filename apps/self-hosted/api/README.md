@@ -111,7 +111,7 @@ Vui lòng tuân theo [Conventional Commits](https://www.conventionalcommits.org/
 
 ### ⭐ Hãy Star repository này nếu bạn thấy hữu ích!
 
-**Được tạo với ❤️ bởi [Dio](https://github.com/doi2523) | © 2025 [Locket Dio](https://locket-dio.com) | Tất cả quyền được bảo lưu**
+**Được tạo với ❤️ bởi [Dio](https://github.com/doi2523) | © 2025 [Locket Dio](http://localhost:5173) | Tất cả quyền được bảo lưu**
 
 [![Về đầu trang](https://img.shields.io/badge/⬆️_Về_Đầu_Trang-Nhấn_Vào_Đây-blue?style=for-the-badge)](#-locket-dio)
 

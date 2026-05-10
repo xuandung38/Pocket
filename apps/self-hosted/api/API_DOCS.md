@@ -268,6 +268,6 @@ Content-Type: application/json
 
 <div align="center">
 
-**[← Về README](./README.md) | © 2025 [Locket Dio](https://locket-dio.com)**
+**[← Về README](./README.md) | © 2025 [Locket Dio](http://localhost:5173)**
 
 </div>
