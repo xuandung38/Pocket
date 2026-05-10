@@ -29,7 +29,7 @@ function MomentSlide({ moment, friend, isOwn }) {
   const avatar = friend?.profilePic ?? friend?.profile_picture_url;
   const caption = moment?.caption;
   const when = moment?.date || moment?.createTime;
-  const ownerUid = moment?.user ?? moment?.userUid ?? moment?.owner;
+  const ownerUid = getMomentOwnerUid(moment);
 
   // Per-slide video ref + IntersectionObserver: only the visible slide plays.
   // Prevents all <video> elements from autoplaying simultaneously (perf).

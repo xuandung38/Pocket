@@ -56,6 +56,12 @@ const EmojiStudio = () => {
     }
   }, [showEmojiPicker]);
 
+  // Clear pending timers on unmount so they don't fire against an unmounted component.
+  useEffect(() => () => {
+    clearInterval(holdInterval.current);
+    clearTimeout(holdTimeout.current);
+  }, []);
+
   // Reset all states
   const resetAllStates = () => {
     setActiveEmojiId(null);

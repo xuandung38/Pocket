@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { CheckCircle2, X } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { SonnerError, SonnerSuccess } from "@/components/ui/SonnerToast";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { useAuthStore } from "@/stores";
 import {
   getOutgoingRequestFriend,
@@ -25,6 +26,8 @@ const OutgoingRequest = () => {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState(null);
   const [showAllFriends, setShowAllFriends] = useState(false);
+  const [pendingCancelUid, setPendingCancelUid] = useState(null);
+  const [pendingCancelName, setPendingCancelName] = useState("");
 
   useEffect(() => {
     if (isFriendsTabOpen) {
@@ -58,12 +61,15 @@ const OutgoingRequest = () => {
     }
   };
 
-  const handleCancelRequest = async (uid, name) => {
-    // Note: window.confirm is intentional parity with web source. Lovekit
-    // ConfirmDialog could replace this in a future enhancement.
-    if (!window.confirm(`Bạn có muốn huỷ yêu cầu kết bạn tới ${name}?`)) {
-      return;
-    }
+  const handleCancelRequest = (uid, name) => {
+    setPendingCancelUid(uid);
+    setPendingCancelName(name);
+  };
+
+  const handleConfirmCancel = async () => {
+    const uid = pendingCancelUid;
+    const name = pendingCancelName;
+    setPendingCancelUid(null);
     try {
       await rejectFriendRequests(uid, "outgoing");
       SonnerSuccess(
@@ -80,6 +86,14 @@ const OutgoingRequest = () => {
   const visibleFriends = showAllFriends ? friends : friends.slice(0, 3);
 
   return (
+    <>
+    <ConfirmDialog
+      open={!!pendingCancelUid}
+      title="Huỷ yêu cầu kết bạn?"
+      message={`Bạn có muốn huỷ yêu cầu kết bạn tới ${pendingCancelName}?`}
+      onConfirm={handleConfirmCancel}
+      onCancel={() => setPendingCancelUid(null)}
+    />
     <div>
       <h2 className="flex flex-row items-center gap-2 text-base-content font-semibold text-md lg:text-xl mb-3">
         <CheckCircle2 size={22} /> Yêu cầu đã gửi
@@ -162,6 +176,7 @@ const OutgoingRequest = () => {
         </>
       )}
     </div>
+    </>
   );
 };
 

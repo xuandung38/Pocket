@@ -134,7 +134,7 @@ const FriendsSheet = () => {
             />
 
             {/* Requests */}
-            <IncomingFriendRequests handleAcpFriend={handleAcceptRequest} />
+            <IncomingFriendRequests />
             <OutgoingRequest />
           </div>
         </div>
