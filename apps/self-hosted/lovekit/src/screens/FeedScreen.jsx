@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Sparkles } from "lucide-react";
 import EmptyState from "@/components/ui/EmptyState";
 import LoadingSkeleton from "@/components/ui/LoadingSkeleton";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import MomentCard from "@/components/MomentCard";
 import MomentViewer from "@/components/MomentViewer";
 import { DeleteMoment } from "@/services/LocketServices";
@@ -23,6 +24,7 @@ export default function FeedScreen({ className }) {
   const loadFriends = useFriendStore((s) => s.loadFriends);
 
   const [viewerIndex, setViewerIndex] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
   const sentinelRef = useRef(null);
 
   const moments = bucket?.items ?? [];
@@ -66,9 +68,15 @@ export default function FeedScreen({ className }) {
     setViewerIndex(null);
   };
 
-  const handleLongPress = async (moment) => {
+  const handleLongPress = (moment) => {
     if (!moment?.id || moment.user !== meUid) return;
-    if (!confirm("Xoá moment này?")) return;
+    setPendingDelete(moment);
+  };
+
+  const confirmDelete = async () => {
+    const moment = pendingDelete;
+    setPendingDelete(null);
+    if (!moment?.id) return;
     const deletedId = await DeleteMoment(moment.id);
     if (deletedId) await removeMoment(deletedId, meUid);
   };
@@ -134,6 +142,16 @@ export default function FeedScreen({ className }) {
           onDeleted={handleDeleted}
         />
       )}
+
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Xoá moment này?"
+        message="Hành động này không thể hoàn tác."
+        confirmText="Xoá"
+        cancelText="Huỷ"
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </section>
   );
 }

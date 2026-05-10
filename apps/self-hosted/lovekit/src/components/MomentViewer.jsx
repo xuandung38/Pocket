@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { DeleteMoment } from "@/services/LocketServices";
 import FriendAvatar from "@/components/FriendAvatar";
 import EmojiReactionBar from "@/components/EmojiReactionBar";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { formatTimeAgo } from "@/utils";
 import "swiper/css";
 
@@ -21,6 +22,7 @@ export default function MomentViewer({
 }) {
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [deleting, setDeleting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     document.body.classList.add("overflow-hidden");
@@ -38,9 +40,14 @@ export default function MomentViewer({
   const current = moments[activeIndex];
   const isOwn = current?.user === meUid;
 
-  const handleDelete = async () => {
+  const requestDelete = () => {
     if (!current?.id || deleting) return;
-    if (!confirm("Xoá moment này?")) return;
+    setConfirmOpen(true);
+  };
+
+  const handleDelete = async () => {
+    setConfirmOpen(false);
+    if (!current?.id || deleting) return;
     setDeleting(true);
     try {
       const deletedId = await DeleteMoment(current.id);
@@ -78,7 +85,7 @@ export default function MomentViewer({
       {isOwn && (
         <button
           type="button"
-          onClick={handleDelete}
+          onClick={requestDelete}
           disabled={deleting}
           className="absolute top-4 left-4 z-20 p-2 rounded-full bg-white/10 hover:bg-red-500/40 text-white disabled:opacity-50"
           aria-label="Delete moment"
@@ -154,6 +161,16 @@ export default function MomentViewer({
           );
         })}
       </Swiper>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Xoá moment này?"
+        message="Hành động này không thể hoàn tác."
+        confirmText="Xoá"
+        cancelText="Huỷ"
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   );
 }
