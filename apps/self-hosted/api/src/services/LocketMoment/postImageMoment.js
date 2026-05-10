@@ -35,7 +35,6 @@ const postImageToLocket = async ({ userId, idToken, image, optionsData }) => {
           optionsData,
         });
         break;
-
       // custom của Dio
       case "image_icon":
       case "image_gif":
@@ -49,7 +48,11 @@ const postImageToLocket = async ({ userId, idToken, image, optionsData }) => {
         break;
 
       default:
-        throw new Error(`Không hỗ trợ type: ${type}`);
+        postData = creImagePayload.imagePostPayloadDecorative({
+          imageUrl,
+          optionsData,
+        });
+	break;
     }
 
     const postResponse = await instanceLocketV2.post("postMomentV2", postData, {
@@ -118,14 +121,19 @@ const postImageToLocketV2 = async ({
       case "image_gif":
       case "caption_icon":
       case "caption_gif":
+      case "time":
+      case "battery":
+      case "weather":
+      case "steps":
+      case "special":
+      case "background":
+      default:
         postData = creImagePayload.imagePostPayloadIcon({
           imageUrl,
           optionsData,
         });
         break;
 
-      default:
-        throw new Error(`Không hỗ trợ type: ${type}`);
     }
 
     const postResponse = await instanceLocketV2.post("postMomentV2", postData, {

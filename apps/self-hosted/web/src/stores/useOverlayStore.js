@@ -49,7 +49,7 @@ export const useOverlayStore = create((set, get) => ({
       }
 
       const result = await getAllOverlayCaption();
-      const grouped = groupThemesByType(result);
+      const grouped = groupThemesByType(result) ?? { decorative: [], functional: [] };
 
       sessionStorage.setItem("captionOverlays", JSON.stringify(grouped));
 

@@ -7,15 +7,17 @@ const { logGroupWrapper, logInfo } = require("./src/utils/logEventUtils");
 const app = express();
 
 // ✅ Cấu hình CORS nâng cao
+
 const allowedOrigins = [
-  /^http:\/\/localhost:\d+$/, // localhost:*
+  /^http:\/\/localhost:\d+$/,
+  ...( process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",") : []),
 ];
 
 app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true); // Cho phép request từ cùng server (ex: curl)
-      if (allowedOrigins.some((pattern) => pattern.test(origin))) {
+      if (allowedOrigins.some((pattern) => pattern instanceof RegExp ? pattern.test(origin) : pattern === origin)) {
         return callback(null, true);
       }
       return callback(new Error("Not allowed by CORS"));

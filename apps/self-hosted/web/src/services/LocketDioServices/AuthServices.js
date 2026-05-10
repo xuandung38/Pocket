@@ -186,7 +186,7 @@ export const GetUserDataV2 = async () => {
 
 export const GetUserLocket = async () => {
   try {
-    const res = await instanceAuth.get("/locket/getInfoUser");
+    const res = await instanceAuth.post("/locket/getInfoUser");
     return res.data?.data;
   } catch (error) {
     console.error(

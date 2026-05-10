@@ -17,13 +17,13 @@ const errorHandler = require("./src/helpers/error-handler.js");
 
 const app = express();
 app.use(
-  cors({
-    origin: ["http://localhost:5173"],
-    methods: ["GET", "POST"],
-
-    // Nhằm cho phép client gửi cookie lên server
-    credentials: true,
-  }),
+ cors({
+  origin: process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(",")
+    : ["http://localhost:5173"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  credentials: true
+ })
 );
 
 app.use(cookieParser());
