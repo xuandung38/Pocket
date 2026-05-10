@@ -144,7 +144,6 @@ api.interceptors.response.use(
     const status = error.response?.status || error.status;
     const message =
       error.response?.data?.message ||
-      error.response?.data?.error ||
       error.response?.data?.error?.message;
 
     const originalRequest = error.config;
