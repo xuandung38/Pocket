@@ -28,6 +28,8 @@ router.post("/postMomentV2", verifyIdToken, locketController.uploadMediaV2);
 
 
 router.post("/getMomentV2", verifyIdToken, locketController.getMoments);
+router.post("/getInfoMomentV2", verifyIdToken, locketController.getInfoMoment);
 router.post("/getAllMessageV2", verifyIdToken, locketController.getMessages);
+router.post("/getMessageWithUserV2", verifyIdToken, locketController.getMessagesWithUser);
 
 module.exports = router;

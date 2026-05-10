@@ -133,6 +133,49 @@ function parseFirestoreValue(v) {
   return null;
 }
 
+// Get reactions for a specific moment using Firestore collection group query
+const getMomentInfo = async (idToken, userId, idMoment) => {
+  try {
+    // Reactions are stored as a subcollection under the moment entry.
+    // Use runQuery on the (default) database to find reactions where
+    // canonical_uid matches the moment ID across all users.
+    const response = await instanceFirestore.post(
+      `(default)/documents:runQuery`,
+      {
+        structuredQuery: {
+          from: [{ collectionId: "reactions", allDescendants: true }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: "moment_uid" },
+              op: "EQUAL",
+              value: { stringValue: idMoment },
+            },
+          },
+        },
+      },
+      { meta: { idToken } },
+    );
+
+    const docs = (response.data || [])
+      .filter((item) => item.document?.fields)
+      .map((item) => {
+        const f = item.document.fields;
+        return {
+          user: parseFirestoreValue(f.user_uid || f.user || f.uid),
+          emoji: parseFirestoreValue(f.reaction || f.emoji),
+          intensity: parseFirestoreValue(f.intensity) || 0,
+          createdAt: parseFirestoreValue(f.created_at || f.date) || null,
+        };
+      })
+      .filter((r) => r.user && r.emoji);
+
+    return { reactions: docs };
+  } catch {
+    return { reactions: [] };
+  }
+};
+
 module.exports = {
   getLocketMoments,
+  getMomentInfo,
 };

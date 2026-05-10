@@ -1,5 +1,44 @@
 const { instanceFirestore } = require("../../libs");
 
+const getMessagesWithUser = async (idToken, userId, conversationId, pageToken, limit = 30) => {
+  const params = { pageSize: limit, orderBy: "create_time desc" };
+  if (pageToken) params.pageToken = pageToken;
+
+  try {
+    const response = await instanceFirestore.get(
+      `/(default)/documents/users/${userId}/conversations/${conversationId}/messages`,
+      { params, meta: { idToken } },
+    );
+    const documents = response.data.documents || [];
+    const messages = documents.map(normalizeMessageItem).filter(Boolean);
+    return {
+      messages,
+      nextPageToken: response.data.nextPageToken || null,
+    };
+  } catch (error) {
+    console.error("❌ Lỗi khi lấy messages:", error.response?.data || error.message);
+    return { messages: [], nextPageToken: null };
+  }
+};
+
+function normalizeMessageItem(doc) {
+  if (!doc || !doc.fields) return null;
+  const f = doc.fields;
+  const toSeconds = (ts) => (ts ? Math.floor(new Date(ts).getTime() / 1000) : 0);
+  return {
+    id: doc.name?.split("/").pop(),
+    uid: f.uid?.stringValue || doc.name?.split("/").pop(),
+    body: f.body?.stringValue || "",
+    sender: f.sender?.stringValue || "",
+    type: f.type?.stringValue || "text",
+    createdAt: toSeconds(f.created_at?.timestampValue),
+    update_time: toSeconds(f.created_at?.timestampValue),
+    replyMoment: f.reply_moment?.stringValue || null,
+    thumbnailUrl: replaceFirebaseWithCDN(f.thumbnail_url?.stringValue),
+    isRead: f.is_read?.booleanValue || false,
+  };
+}
+
 const getAllMessages = async (idToken, userId, pageToken, limit = 20) => {
   const params = {
     pageSize: limit,
@@ -106,4 +145,5 @@ function replaceFirebaseWithCDN(url) {
 
 module.exports = {
   getAllMessages,
+  getMessagesWithUser,
 };

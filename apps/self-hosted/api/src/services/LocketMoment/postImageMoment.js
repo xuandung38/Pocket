@@ -116,17 +116,35 @@ const postImageToLocketV2 = async ({
         });
         break;
 
+      // weather overlay
+      case "weather":
+        postData = creImagePayload.imagePostPayloadWeather({
+          imageUrl,
+          optionsData,
+        });
+        break;
+
+      case "time":
+        postData = creImagePayload.imagePostPayloadTime({ imageUrl, optionsData });
+        break;
+      case "battery":
+        postData = creImagePayload.imagePostPayloadBattery({ imageUrl, optionsData });
+        break;
+      case "steps":
+        postData = creImagePayload.imagePostPayloadSteps({ imageUrl, optionsData });
+        break;
+      case "special":
+        postData = creImagePayload.imagePostPayloadSpecial({ imageUrl, optionsData });
+        break;
+      case "background":
+        postData = creImagePayload.imagePostPayloadBackground({ imageUrl, optionsData });
+        break;
+
       // custom của Dio
       case "image_icon":
       case "image_gif":
       case "caption_icon":
       case "caption_gif":
-      case "time":
-      case "battery":
-      case "weather":
-      case "steps":
-      case "special":
-      case "background":
       default:
         postData = creImagePayload.imagePostPayloadIcon({
           imageUrl,
@@ -172,6 +190,24 @@ const postImageToLocketDirect = async ({ idToken, imageUrl, optionsData }) => {
         break;
       case "decorative":
         postData = creImagePayload.imagePostPayloadDecorative({ imageUrl, optionsData });
+        break;
+      case "weather":
+        postData = creImagePayload.imagePostPayloadWeather({ imageUrl, optionsData });
+        break;
+      case "time":
+        postData = creImagePayload.imagePostPayloadTime({ imageUrl, optionsData });
+        break;
+      case "battery":
+        postData = creImagePayload.imagePostPayloadBattery({ imageUrl, optionsData });
+        break;
+      case "steps":
+        postData = creImagePayload.imagePostPayloadSteps({ imageUrl, optionsData });
+        break;
+      case "special":
+        postData = creImagePayload.imagePostPayloadSpecial({ imageUrl, optionsData });
+        break;
+      case "background":
+        postData = creImagePayload.imagePostPayloadBackground({ imageUrl, optionsData });
         break;
       case "image_icon":
       case "image_gif":

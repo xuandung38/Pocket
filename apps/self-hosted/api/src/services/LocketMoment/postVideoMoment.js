@@ -53,15 +53,30 @@ const postVideoToLocket = async ({ userId, idToken, video, optionsData }) => {
         });
         break;
 
+      case "weather":
+        postData = creVideoPayload.videoPostPayloadWeather({ videoUrl, thumbnailUrl, optionsData });
+        break;
+      case "time":
+        postData = creVideoPayload.videoPostPayloadTime({ videoUrl, thumbnailUrl, optionsData });
+        break;
+      case "battery":
+        postData = creVideoPayload.videoPostPayloadBattery({ videoUrl, thumbnailUrl, optionsData });
+        break;
+      case "steps":
+        postData = creVideoPayload.videoPostPayloadSteps({ videoUrl, thumbnailUrl, optionsData });
+        break;
+      case "special":
+        postData = creVideoPayload.videoPostPayloadSpecial({ videoUrl, thumbnailUrl, optionsData });
+        break;
+      case "background":
+        postData = creVideoPayload.videoPostPayloadBackground({ videoUrl, thumbnailUrl, optionsData });
+        break;
+
       case "image_icon":
       case "image_gif":
       case "caption_icon":
       case "caption_gif":
-        postData = creVideoPayload.videoPostPayloadIcon({
-          videoUrl,
-          thumbnailUrl,
-          optionsData,
-        });
+        postData = creVideoPayload.videoPostPayloadIcon({ videoUrl, thumbnailUrl, optionsData });
         break;
 
       default:
@@ -143,15 +158,30 @@ const postVideoToLocketV2 = async ({
         });
         break;
 
+      case "weather":
+        postData = creVideoPayload.videoPostPayloadWeather({ videoUrl, thumbnailUrl, optionsData });
+        break;
+      case "time":
+        postData = creVideoPayload.videoPostPayloadTime({ videoUrl, thumbnailUrl, optionsData });
+        break;
+      case "battery":
+        postData = creVideoPayload.videoPostPayloadBattery({ videoUrl, thumbnailUrl, optionsData });
+        break;
+      case "steps":
+        postData = creVideoPayload.videoPostPayloadSteps({ videoUrl, thumbnailUrl, optionsData });
+        break;
+      case "special":
+        postData = creVideoPayload.videoPostPayloadSpecial({ videoUrl, thumbnailUrl, optionsData });
+        break;
+      case "background":
+        postData = creVideoPayload.videoPostPayloadBackground({ videoUrl, thumbnailUrl, optionsData });
+        break;
+
       case "image_icon":
       case "image_gif":
       case "caption_icon":
       case "caption_gif":
-        postData = creVideoPayload.videoPostPayloadIcon({
-          videoUrl,
-          thumbnailUrl,
-          optionsData,
-        });
+        postData = creVideoPayload.videoPostPayloadIcon({ videoUrl, thumbnailUrl, optionsData });
         break;
 
       default:

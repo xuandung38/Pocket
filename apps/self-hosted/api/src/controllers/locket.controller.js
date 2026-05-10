@@ -87,6 +87,18 @@ class LocketController {
       next(error);
     }
   }
+
+  async getInfoMoment(req, res, next) {
+    try {
+      const { idToken, localId } = req.user;
+      const { idMoment } = req.body;
+      if (!idMoment) return res.status(400).json({ success: false, message: "Thiếu idMoment" });
+      const data = await postServices.getMomentInfo(idToken, localId, idMoment);
+      return res.status(200).json({ data, success: true, message: "ok" });
+    } catch (error) {
+      next(error);
+    }
+  }
   async getMessages(req, res, next) {
     try {
       const { idToken, localId } = req.user;
@@ -100,6 +112,23 @@ class LocketController {
           success: true,
           message: "ok",
         });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getMessagesWithUser(req, res, next) {
+    try {
+      const { idToken, localId } = req.user;
+      const { messageId } = req.body;
+      if (!messageId) return res.status(400).json({ success: false, message: "Thiếu messageId" });
+      const data = await chatServices.getMessagesWithUser(idToken, localId, messageId);
+      return res.status(200).json({
+        data: data.messages,
+        nextPageToken: data.nextPageToken,
+        success: true,
+        message: "ok",
+      });
     } catch (error) {
       next(error);
     }
