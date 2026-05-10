@@ -13,6 +13,13 @@ import { instanceAuth } from "./axios.auth";
 
 // ==== Kiểm tra token sắp hết hạn (dưới 5 phút) ====
 let cachedExp = null;
+
+// Reset token expiry cache (called from useAuthStore.clearAndlogout on logout
+// so the next session evaluates the new idToken's exp claim fresh).
+export function resetTokenCache() {
+  cachedExp = null;
+}
+
 function isTokenExpired(token) {
   if (!token) return true;
 

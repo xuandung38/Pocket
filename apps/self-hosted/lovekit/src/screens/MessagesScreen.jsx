@@ -12,13 +12,11 @@ import { useSocket } from "@/context/SocketContext";
 export default function MessagesScreen({ className }) {
   const [activeChatId, setActiveChatId] = useState(null);
 
-  const {
-    conversations,
-    loading,
-    fetchConversations,
-    upsertConversation,
-    addMessageWithUserV2,
-  } = useMessagesStore();
+  const conversations = useMessagesStore((s) => s.conversations);
+  const loading = useMessagesStore((s) => s.loading);
+  const fetchConversations = useMessagesStore((s) => s.fetchConversations);
+  const upsertConversation = useMessagesStore((s) => s.upsertConversation);
+  const addMessageWithUserV2 = useMessagesStore((s) => s.addMessageWithUserV2);
 
   const friendDetailsMap = useFriendStoreV2((s) => s.friendDetailsMap);
   const loadFriends = useFriendStoreV2((s) => s.loadFriends);

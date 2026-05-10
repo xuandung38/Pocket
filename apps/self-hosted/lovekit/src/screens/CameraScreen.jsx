@@ -1,16 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { Loader2, RotateCcw, Send, Users, X } from "lucide-react";
+import { Loader2, RotateCcw, Send, Settings, Image as ImageIcon, Users, X } from "lucide-react";
 import CameraPreview from "@/components/CameraPreview";
 import CaptureButton from "@/components/CaptureButton";
 import CaptionInput from "@/components/CaptionInput";
+import FriendAvatar from "@/components/FriendAvatar";
 import FriendPickerSheet from "@/components/FriendPickerSheet";
+import FriendMomentRow from "@/components/FriendMomentRow";
 import UploadProgressChip from "@/components/UploadProgressChip";
 import { defaultPostOverlay } from "@/stores/usePost";
-import {
-  useFriendStoreV2,
-  useUploadQueueStore,
-} from "@/stores";
+import { useAuthStore, useFriendStoreV2, useUploadQueueStore } from "@/stores";
 import { createRequestPayloadV5 } from "@/services";
 import {
   SonnerError,
@@ -18,16 +17,22 @@ import {
   SonnerWarning,
 } from "@/components/ui/SonnerToast";
 
-export default function CameraScreen({ className }) {
-  const previewRef = useRef(null);
+const SWIPE_HINT_KEY = "lk:swipe-hint-seen";
 
-  const [phase, setPhase] = useState("preview"); // "preview" | "captured" | "posting"
-  const [shot, setShot] = useState(null); // { type, file, url }
+export default function CameraScreen({ className, isActive = true }) {
+  const previewRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  const [phase, setPhase] = useState("preview");
+  const [shot, setShot] = useState(null);
   const [caption, setCaption] = useState("");
   const [audience, setAudience] = useState("all");
   const [recipients, setRecipients] = useState([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [facingMode, setFacingMode] = useState("user");
+  const [showSwipeHint, setShowSwipeHint] = useState(false);
 
+  const user = useAuthStore((s) => s.user);
   const loadFriends = useFriendStoreV2((s) => s.loadFriends);
   const friendsLoaded = useFriendStoreV2(
     (s) => Object.keys(s.friendDetailsMap || {}).length,
@@ -37,6 +42,19 @@ export default function CameraScreen({ className }) {
   useEffect(() => {
     if (!friendsLoaded) loadFriends?.();
   }, [friendsLoaded, loadFriends]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const seen = window.localStorage.getItem(SWIPE_HINT_KEY);
+      if (!seen) {
+        setShowSwipeHint(true);
+        window.localStorage.setItem(SWIPE_HINT_KEY, "1");
+      }
+    } catch {
+      /* noop */
+    }
+  }, []);
 
   const getVideo = useCallback(() => previewRef.current?.video || null, []);
 
@@ -54,9 +72,27 @@ export default function CameraScreen({ className }) {
     setPhase("preview");
   }, [shot]);
 
+  const handleGalleryClick = () => fileInputRef.current?.click();
+
+  const handleGalleryChange = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const isVideo = file.type.startsWith("video/");
+    const isImage = file.type.startsWith("image/");
+    if (!isImage && !isVideo) {
+      SonnerWarning("Định dạng không hỗ trợ.");
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    handleCapture({ type: isVideo ? "video" : "image", file, url });
+  };
+
+  const handleFlip = () =>
+    setFacingMode((m) => (m === "user" ? "environment" : "user"));
+
   const handlePost = useCallback(async () => {
     if (!shot?.file) return;
-
     if (audience === "selected" && recipients.length === 0) {
       SonnerWarning("Hãy chọn ít nhất một người nhận.");
       return;
@@ -75,10 +111,7 @@ export default function CameraScreen({ className }) {
       if (!payload) throw new Error("Không tạo được payload.");
 
       await enqueueUploadItem(payload);
-      SonnerSuccess(
-        "Đã thêm vào hàng đợi!",
-        "Bài viết đang được tải lên...",
-      );
+      SonnerSuccess("Đã thêm vào hàng đợi!", "Bài viết đang được tải lên...");
       resetToPreview();
     } catch (err) {
       const msg =
@@ -97,83 +130,120 @@ export default function CameraScreen({ className }) {
       ? "1 người"
       : `${recipients.length} người`;
 
+  const meName =
+    [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim() ||
+    user?.displayName ||
+    "You";
+  const meAvatar = user?.profilePic || user?.photoURL || user?.picture || null;
+
   return (
     <section
       role="tabpanel"
       aria-label="Capture"
       className={clsx(
-        "absolute inset-0 bg-black text-white overflow-hidden",
+        "flex flex-col h-full bg-base-100 text-base-content overflow-hidden",
+        "pt-[env(safe-area-inset-top)]",
         className,
       )}
     >
-      <div className="absolute inset-0">
-        <CameraPreview
-          ref={previewRef}
-          active
-          facingMode="user"
-        />
+      <header className="flex items-center justify-between px-4 pt-2 pb-2">
+        <FriendAvatar src={meAvatar} name={meName} size="md" />
+        <h1 className="font-semibold text-lg">Lovekit</h1>
+        <button
+          type="button"
+          aria-label="Settings"
+          className="size-10 rounded-full bg-base-200 flex items-center justify-center"
+        >
+          <Settings className="size-5" />
+        </button>
+      </header>
+
+      <div className="px-4 flex justify-center">
+        <UploadProgressChip />
       </div>
 
-      {phase !== "preview" && shot && (
-        <div className="absolute inset-0 bg-black">
-          {shot.type === "image" ? (
-            <img
-              src={shot.url}
-              alt="Captured"
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <video
-              src={shot.url}
-              autoPlay
-              loop
-              muted
-              playsInline
-              className="w-full h-full object-cover"
+      <div className="flex justify-center py-3">
+        <div
+          className={clsx(
+            "relative w-[88vw] max-w-[440px] aspect-square mx-auto",
+            "rounded-3xl overflow-hidden",
+            "ring-4 ring-primary/40 shadow-lg shadow-primary/30",
+            "bg-base-200",
+          )}
+        >
+          {phase === "preview" && (
+            <CameraPreview
+              ref={previewRef}
+              active={isActive}
+              facingMode={facingMode}
             />
           )}
-        </div>
-      )}
 
-      <div className="absolute top-0 inset-x-0 px-4 pt-[max(env(safe-area-inset-top),1rem)] pb-3 flex items-center justify-between z-10">
-        <UploadProgressChip />
-        {phase === "captured" && (
-          <button
-            type="button"
-            onClick={resetToPreview}
-            aria-label="Hủy"
-            className="size-10 rounded-full bg-black/45 backdrop-blur-md flex items-center justify-center text-white"
-          >
-            <X className="size-5" />
-          </button>
-        )}
+          {phase !== "preview" && shot && (
+            <>
+              {shot.type === "image" ? (
+                <img
+                  src={shot.url}
+                  alt="Captured"
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+              ) : (
+                <video
+                  src={shot.url}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+              )}
+
+              {phase === "captured" && (
+                <button
+                  type="button"
+                  onClick={resetToPreview}
+                  aria-label="Hủy"
+                  className="absolute top-3 right-3 size-9 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center text-white"
+                >
+                  <X className="size-4" />
+                </button>
+              )}
+
+              {phase === "posting" && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm text-white">
+                  <Loader2 className="size-8 animate-spin" />
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {phase === "captured" && (
-        <div className="absolute left-0 right-0 bottom-32 px-6 z-10">
+        <div className="px-6 pb-2">
           <CaptionInput value={caption} onChange={setCaption} />
         </div>
       )}
 
-      <div className="absolute left-0 right-0 bottom-6 px-6 z-10 flex items-center justify-between gap-4">
+      <div className="flex items-center justify-around px-8 py-4">
         {phase === "preview" && (
           <>
-            <div className="size-14" />
-            <CaptureButton
-              getVideo={getVideo}
-              mirror
-              onCapture={handleCapture}
-            />
             <button
               type="button"
-              onClick={() => setPickerOpen(true)}
-              aria-label="Chọn người nhận"
-              className="size-14 rounded-full bg-black/45 backdrop-blur-md flex flex-col items-center justify-center text-white"
+              onClick={handleGalleryClick}
+              aria-label="Mở thư viện"
+              className="size-12 rounded-full bg-base-200 flex items-center justify-center active:scale-95 transition-transform"
             >
-              <Users className="size-5" />
-              <span className="text-[10px] font-semibold mt-0.5 truncate max-w-12">
-                {audience === "all" ? "Tất cả" : recipients.length || ""}
-              </span>
+              <ImageIcon className="size-5" />
+            </button>
+            <CaptureButton getVideo={getVideo} mirror={facingMode === "user"} onCapture={handleCapture} />
+            <button
+              type="button"
+              onClick={handleFlip}
+              aria-label="Đổi camera"
+              className="size-12 rounded-full bg-base-200 flex items-center justify-center active:scale-95 transition-transform"
+            >
+              <RotateCcw className="size-5" />
             </button>
           </>
         )}
@@ -184,35 +254,23 @@ export default function CameraScreen({ className }) {
               type="button"
               onClick={resetToPreview}
               aria-label="Chụp lại"
-              className="size-14 rounded-full bg-black/45 backdrop-blur-md flex items-center justify-center text-white"
+              className="size-12 rounded-full bg-base-200 flex items-center justify-center"
             >
               <RotateCcw className="size-5" />
             </button>
-
             <button
               type="button"
               onClick={() => setPickerOpen(true)}
-              className={clsx(
-                "flex-1 rounded-full px-4 py-3",
-                "bg-black/45 backdrop-blur-md text-white",
-                "flex items-center justify-center gap-2 text-sm font-semibold",
-              )}
+              className="flex-1 mx-4 rounded-full px-4 py-3 bg-base-200 text-base-content flex items-center justify-center gap-2 text-sm font-semibold"
             >
               <Users className="size-4" />
               <span className="truncate">Gửi tới: {audienceLabel}</span>
             </button>
-
             <button
               type="button"
               onClick={handlePost}
-              disabled={phase === "posting"}
               aria-label="Gửi"
-              className={clsx(
-                "size-14 rounded-full flex items-center justify-center",
-                "bg-primary text-primary-content",
-                "shadow-[0_8px_20px_-6px_rgba(249,115,22,0.55)]",
-                "active:scale-95 transition disabled:opacity-60",
-              )}
+              className="size-12 rounded-full flex items-center justify-center bg-primary text-primary-content shadow-lg shadow-primary/40 active:scale-95 transition-transform"
             >
               <Send className="size-5" />
             </button>
@@ -220,12 +278,28 @@ export default function CameraScreen({ className }) {
         )}
 
         {phase === "posting" && (
-          <div className="flex-1 flex items-center justify-center gap-2 text-white text-sm font-medium">
+          <div className="flex-1 flex items-center justify-center gap-2 text-base-content/70 text-sm font-medium">
             <Loader2 className="size-5 animate-spin" />
             Đang gửi…
           </div>
         )}
       </div>
+
+      <FriendMomentRow />
+
+      {showSwipeHint && phase === "preview" && (
+        <p className="text-center text-xs text-base-content/50 pb-3 animate-pulse">
+          ↑ vuốt lên để xem feed
+        </p>
+      )}
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,video/*"
+        onChange={handleGalleryChange}
+        className="hidden"
+      />
 
       <FriendPickerSheet
         open={pickerOpen}

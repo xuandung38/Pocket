@@ -1,5 +1,5 @@
 const { instanceLocketV2 } = require("../../libs");
-const { logError } = require("../../utils/logEventUtils");
+const { logError, logInfo } = require("../../utils/logEventUtils");
 
 function replaceFirebaseWithCDN(url) {
   if (!url) return null;
@@ -98,9 +98,12 @@ const getLocketMomentsFromAPI = async (
     });
 
     const result = response.data?.result;
-    // API may return moments under result.data.moments or result.moments
+    logInfo("getLocketMomentsFromAPI", `status=${response.status} result_keys=${JSON.stringify(Object.keys(result || {}))}`);
+
     const rawMoments = result?.data?.moments || result?.moments || [];
     const newSyncToken = result?.data?.sync_token || result?.sync_token || null;
+
+    logInfo("getLocketMomentsFromAPI", `rawMoments.length=${rawMoments.length} syncToken=${newSyncToken}`);
 
     let moments = rawMoments.map(normalizeApiMoment).filter(Boolean);
 
@@ -114,7 +117,7 @@ const getLocketMomentsFromAPI = async (
 
     return { moments, syncToken: newSyncToken };
   } catch (err) {
-    logError("getLocketMomentsFromAPI", err.response?.data || err.message);
+    logError("getLocketMomentsFromAPI", `status=${err.response?.status} error=${JSON.stringify(err.response?.data || err.message)}`);
     return { moments: [], syncToken: null };
   }
 };

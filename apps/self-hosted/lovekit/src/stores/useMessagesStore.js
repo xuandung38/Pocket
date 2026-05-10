@@ -181,16 +181,18 @@ export const useMessagesStore = create((set, get) => ({
   },
 
   // ==== 5️⃣ Remove message ====
+  // messages shape: { [conversationId]: [msg, ...] } — filter each bucket.
+  // conversations shape: [conv, ...] — leave intact (a message removal does
+  // not remove its conversation).
   removeMessage: (msgId) => {
-    const { messages, conversations } = get();
-    const updatedMessages = messages.filter((m) => m.id !== msgId);
-    const updatedConversations = Object.fromEntries(
-      Object.entries(conversations).map(([uid, msgs]) => [
+    const { messages } = get();
+    const updatedMessages = Object.fromEntries(
+      Object.entries(messages).map(([uid, msgs]) => [
         uid,
-        msgs.filter((m) => m.id !== msgId),
+        Array.isArray(msgs) ? msgs.filter((m) => m.id !== msgId) : msgs,
       ])
     );
-    set({ messages: updatedMessages, conversations: updatedConversations });
+    set({ messages: updatedMessages });
     // deleteMessageById(msgId) nếu muốn xoá local DB
   },
 
