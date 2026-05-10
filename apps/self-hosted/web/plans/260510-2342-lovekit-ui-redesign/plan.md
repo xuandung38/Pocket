@@ -161,7 +161,7 @@ activate ck:chrome-devtools
 | 05 | [MessagesScreen (list + chat detail)](./phase-05-messages-screen.md) | 5h | completed | 02 |
 | 06 | [ProfileScreen (streak + friends + rollcall)](./phase-06-profile-screen.md) | 4h | completed | 02 |
 | 07 | [Empty states + skeletons + polish](./phase-07-empty-states-polish.md) | 2h | pending | 03,04,05,06 |
-| 08 | [Docker — lovekit service on port 5175](./phase-08-docker.md) | 1h | pending | 07 |
+| 08 | [Docker — lovekit service on port 5175](./phase-08-docker.md) | 1h | completed | 07 |
 
 Phases 03–06 parallelizable after 02 lands.
 

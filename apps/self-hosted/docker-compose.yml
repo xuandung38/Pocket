@@ -41,3 +41,18 @@ services:
       - api
       - storage
     restart: unless-stopped
+
+  lovekit:
+    build:
+      context: ./lovekit
+      dockerfile: Dockerfile
+    container_name: lovekit-pwa
+    env_file:
+      - ./lovekit/.env.production
+    environment:
+      - NODE_ENV=production
+    ports:
+      - "5175:5175"
+    depends_on:
+      - api
+    restart: unless-stopped
