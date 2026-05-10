@@ -24,5 +24,6 @@ export const GetInfoMoment = async (idMoment) => {
     return moments;
   } catch (err) {
     console.warn("❌ React Failed", err);
+    return { reactions: [] };
   }
 };

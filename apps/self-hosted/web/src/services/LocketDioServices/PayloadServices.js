@@ -75,6 +75,7 @@ export const createRequestPayloadV5 = async (
       recipients: determineRecipients(audience, selectedRecipients, localId),
       music: postOverlay?.music || "",
       isStreaktoday: isStreakToday,
+      ...(postOverlay.weatherData && { weatherData: postOverlay.weatherData }),
     };
 
     let mediaInfo;
@@ -152,9 +153,10 @@ export const createRequestPayloadV4 = async (
       text_color: postOverlay.text_color,
       color_top: postOverlay.color_top,
       color_bottom: postOverlay.color_bottom,
-      audience, // Gắn audience vào options luôn
+      audience,
       recipients: determineRecipients(audience, selectedRecipients, localId),
       music: postOverlay?.music || "",
+      ...(postOverlay.weatherData && { weatherData: postOverlay.weatherData }),
     };
 
     // Chỉ thêm restoreStreakDate nếu mode là "restore"

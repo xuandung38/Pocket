@@ -168,22 +168,19 @@ const MusicOverlay = ({ postOverlay }) => {
 };
 
 const WeatherOverlay = ({ postOverlay }) => {
+  const weatherData = postOverlay?.weatherData;
   return (
     <div className="flex items-center bg-white/50 backdrop-blur-2xl gap-1 py-2 px-4 rounded-4xl absolute bottom-2 left-1/2 transform -translate-x-1/2 text-white font-semibold">
       <img
         src={
-          postOverlay?.caption?.icon
-            ? `https:${postOverlay?.caption?.icon}`
+          weatherData?.icon
+            ? `https:${weatherData.icon}`
             : "./images/sun_max_indicator.png"
         }
-        alt={postOverlay?.caption?.condition || "Thời tiết"}
+        alt={weatherData?.condition || "Thời tiết"}
         className="w-6 h-6"
       />
-      <span>
-        {postOverlay?.caption?.temp_c_rounded !== undefined
-          ? `${postOverlay?.caption?.temp_c_rounded}°C`
-          : "Thời tiết"}
-      </span>
+      <span>{postOverlay?.caption || "Thời tiết"}</span>
     </div>
   );
 };

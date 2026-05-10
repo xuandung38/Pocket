@@ -55,6 +55,7 @@ export default function GeneralThemes({ title }) {
       caption: data.caption || "",
       type: data.type || "default",
       ...(data.music && { music: data.music }),
+      ...(data.weatherData && { weatherData: data.weatherData }),
     });
     setIsFilterOpen(false);
   };
@@ -143,10 +144,13 @@ export default function GeneralThemes({ title }) {
         });
         break;
       case "weather":
+        if (!weather) break;
         handleCustomeSelect({
           preset_id: "weather",
-          caption: weather || {},
+          caption: `${weather.temp_c_rounded ?? "?"}°C`,
           type: "weather",
+          text_color: "#FFFFFF",
+          weatherData: weather,
         });
         break;
       case "battery":
