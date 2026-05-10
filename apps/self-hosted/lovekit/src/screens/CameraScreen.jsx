@@ -11,6 +11,7 @@ import UploadProgressChip from "@/components/UploadProgressChip";
 import { defaultPostOverlay } from "@/stores/usePost";
 import { useAuthStore, useFriendStoreV2, useUploadQueueStore } from "@/stores";
 import { createRequestPayloadV5 } from "@/services";
+import { useApp } from "@/context/AppContext";
 import {
   SonnerError,
   SonnerSuccess,
@@ -38,6 +39,11 @@ export default function CameraScreen({ className, isActive = true }) {
     (s) => Object.keys(s.friendDetailsMap || {}).length,
   );
   const enqueueUploadItem = useUploadQueueStore((s) => s.enqueueUploadItem);
+
+  // AppContext.post drives CropImageStudio (mounted at App.jsx by dev-7).
+  // Safe-access: if AppProvider isn't wrapped yet, crop flow is bypassed.
+  const app = useApp();
+  const postCtx = app?.post;
 
   useEffect(() => {
     if (!friendsLoaded) loadFriends?.();
@@ -84,9 +90,29 @@ export default function CameraScreen({ className, isActive = true }) {
       SonnerWarning("Định dạng không hỗ trợ.");
       return;
     }
+    // Route still images through CropImageStudio when AppContext is available;
+    // videos and the no-provider fallback go straight to captured phase.
+    if (isImage && postCtx?.setImageToCrop) {
+      postCtx.setImageToCrop(URL.createObjectURL(file));
+      return;
+    }
     const url = URL.createObjectURL(file);
     handleCapture({ type: isVideo ? "video" : "image", file, url });
   };
+
+  // Bridge AppContext.post (set by CropImageStudio after crop confirm)
+  // back into local shot state so the existing captured-phase UI works unchanged.
+  useEffect(() => {
+    if (!postCtx) return;
+    const file = postCtx.selectedFile;
+    const preview = postCtx.preview;
+    if (!file || preview?.type !== "image" || !preview?.data) return;
+    handleCapture({ type: "image", file, url: preview.data });
+    // Clear post state to avoid re-triggering on re-renders.
+    postCtx.setSelectedFile?.(null);
+    postCtx.setPreview?.(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postCtx?.selectedFile, postCtx?.preview]);
 
   const handleFlip = () =>
     setFacingMode((m) => (m === "user" ? "environment" : "user"));
