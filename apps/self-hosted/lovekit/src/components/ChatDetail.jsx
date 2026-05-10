@@ -32,8 +32,9 @@ export default function ChatDetail({
   const [loading, setLoading] = useState(false);
   const [animate, setAnimate] = useState(false);
 
-  const { messages, getMessagesByUser, addMessageWithUserV2 } =
-    useMessagesStore();
+  const messages = useMessagesStore((s) => s.messages);
+  const getMessagesByUser = useMessagesStore((s) => s.getMessagesByUser);
+  const addMessageWithUserV2 = useMessagesStore((s) => s.addMessageWithUserV2);
 
   const conversationId = conversation?.uid;
   const list = conversationId ? messages[conversationId] || [] : [];
@@ -124,7 +125,7 @@ export default function ChatDetail({
       )}
     >
       {/* Header */}
-      <div className="shrink-0 flex items-center gap-3 px-3 py-3 border-b border-base-200 bg-base-100">
+      <div className="shrink-0 flex items-center gap-3 px-3 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] border-b border-base-200 bg-base-100">
         <button
           type="button"
           onClick={onClose}

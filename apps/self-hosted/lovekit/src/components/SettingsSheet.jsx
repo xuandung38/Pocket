@@ -20,9 +20,12 @@ export default function SettingsSheet({ open, onClose, onLogout, className }) {
 
   const handleLogout = () => {
     try {
-      localStorage.clear();
+      localStorage.removeItem("idToken");
+      localStorage.removeItem("localId");
+      localStorage.removeItem("refreshToken");
+      sessionStorage.removeItem("lk:nav");
     } catch (err) {
-      console.error("localStorage.clear failed:", err);
+      console.error("logout cleanup failed:", err);
     }
     onLogout?.();
     onClose?.();
