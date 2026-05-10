@@ -5,7 +5,7 @@ import { io } from "socket.io-client";
 export const createSocket = (idToken, { onConnect, onDisconnect, onError } = {}) => {
   if (!idToken) return null;
 
-  const socketClient = io(API_ENDPOINTS.socketUrl, {
+  const socketClient = io(`${API_ENDPOINTS.socketUrl}/chat`, {
     transports: ["websocket"],
     auth: { token: idToken },
     autoConnect: false,
