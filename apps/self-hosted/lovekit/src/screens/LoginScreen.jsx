@@ -53,7 +53,12 @@ export default function LoginScreen({ onLogin }) {
       );
 
       hydrate?.();
-      init?.();
+      try {
+        await init?.();
+      } catch (initErr) {
+        console.error("Auth init failed:", initErr);
+        SonnerError("Failed to load profile");
+      }
       onLogin?.();
     } catch (err) {
       const status = err?.status;
