@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Camera Screen Redesign — Rounded Square + FriendMomentRow"
-status: pending
+status: completed
 priority: P1
 effort: "4h"
 dependencies: []
@@ -89,13 +89,13 @@ Stream teardown: `CameraScreen` receives `isActive` prop (or reads navState from
 
 ## Todo
 
-- [ ] Create `src/components/FriendMomentRow.jsx`
-- [ ] Rewrite `src/screens/CameraScreen.jsx` — bg-base-100, rounded square preview, orange ring, CameraHeader
-- [ ] Add 3-button controls row (gallery, capture, flip)
-- [ ] Add FriendMomentRow below controls
-- [ ] Add swipe-up hint with localStorage dismissal
-- [ ] Add `isActive` prop → stream teardown effect
-- [ ] Test: preview renders, capture works, posting works, stream stops on nav away
+- [x] Create `src/components/FriendMomentRow.jsx`
+- [x] Rewrite `src/screens/CameraScreen.jsx` — bg-base-100, rounded square preview, orange ring, CameraHeader
+- [x] Add 3-button controls row (gallery, capture, flip)
+- [x] Add FriendMomentRow below controls
+- [x] Add swipe-up hint with localStorage dismissal
+- [x] Add `isActive` prop → stream teardown effect
+- [x] Test: preview renders, capture works, posting works, stream stops on nav away
 
 ## Success Criteria
 
