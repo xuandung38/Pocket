@@ -1,4 +1,5 @@
 import { clearAllDB } from "@/cache/configDB";
+import { resetTokenCache } from "@/lib/axios";
 import {
   GetUserDataV2,
   GetUserLocket,
@@ -115,6 +116,7 @@ export const useAuthStore = create((set) => ({
   clearAndlogout: async () => {
     await logout();
     removeToken();
+    resetTokenCache(); // reset axios JWT exp cache so next session re-evaluates fresh
     await clearAllDB();
     localStorage.removeItem(CACHE_KEY); // xóa cache khi logout
     set({
