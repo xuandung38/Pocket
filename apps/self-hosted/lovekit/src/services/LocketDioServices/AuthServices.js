@@ -1,6 +1,5 @@
 import { BETA_SERVER_HOST } from "@/config/apiConfig";
 import { instanceAuth } from "@/lib/axios.auth";
-import { instanceLocketV2 } from "@/lib/axios.locket";
 import { instanceMain } from "@/lib/axios.main";
 import { ValidateEmailAddress } from "../LocketServices";
 //Login
