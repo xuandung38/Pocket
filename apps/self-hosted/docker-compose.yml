@@ -56,3 +56,25 @@ services:
     depends_on:
       - api
     restart: unless-stopped
+
+  # locket-love sits one level up at apps/locket-love (sibling to apps/self-hosted).
+  # Host port 5176 avoids collision with lovekit on 5175; container still listens
+  # on 5175 internally (Vite preview default — see Dockerfile CMD).
+  # env_file is `required: false` so `docker compose build` works pre-deploy
+  # without a .env.production checked in (it's gitignored). Create one from
+  # apps/locket-love/.env.example before `docker compose up`.
+  locket-love:
+    build:
+      context: ../locket-love
+      dockerfile: Dockerfile
+    container_name: locket-love-pwa
+    env_file:
+      - path: ../locket-love/.env.production
+        required: false
+    environment:
+      - NODE_ENV=production
+    ports:
+      - "5176:5175"
+    depends_on:
+      - api
+    restart: unless-stopped
