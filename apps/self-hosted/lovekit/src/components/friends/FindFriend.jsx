@@ -7,7 +7,11 @@ import {
   SonnerSuccess,
   SonnerWarning,
 } from "@/components/ui/SonnerToast";
-import { FindFriendByUserName, SendRequestToCelebrity } from "@/services";
+import {
+  FindFriendByUserName,
+  SendRequestToCelebrity,
+  SendRequestToFriend,
+} from "@/services";
 
 /**
  * FindFriend
@@ -54,7 +58,14 @@ const FindFriend = () => {
         // refetch to refresh friendship_status
         await handleFindFriend(searchTermFind);
       } else {
-        SonnerWarning("Chưa hỗ trợ tính năng này!");
+        // Normal user: send a regular friend request via the Locket proxy.
+        // Backend route added in Phase 01; envelope shape verified against
+        // acceptFriendRequest/removeFriend (`{ data: { user_uid } }`).
+        await SendRequestToFriend(foundUser.uid);
+        SonnerSuccess("Đã gửi yêu cầu kết bạn!");
+
+        // refetch so friendship_status reflects the new outgoing-request state
+        await handleFindFriend(searchTermFind);
       }
     } catch (error) {
       console.error("❌ Lỗi gửi yêu cầu:", error);
