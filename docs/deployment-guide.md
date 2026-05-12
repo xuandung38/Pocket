@@ -11,7 +11,7 @@ Complete instructions for deploying Locket Dio to cloud (Vercel + Firebase) and 
 | Deployment | URL | Services | Setup Time |
 |---|---|---|---|
 | **Public Cloud** | http://localhost:5173 | Vercel + Firebase + R2 | 30 min |
-| **Self-Hosted (VPS)** | http://your-domain:5173 | Docker Compose (3 services) | 45 min |
+| **Self-Hosted (VPS)** | http://your-domain:5173 | Docker Compose (5 services) | 45 min |
 | **Local Development** | http://localhost:5173 | Vite dev server | 10 min |
 
 ---
@@ -317,7 +317,9 @@ curl -X POST http://localhost:5003/presigned-url \
 
 ### Step 6: Access Application
 
-- **Web App:** http://localhost:5173
+- **Web App (legacy):** http://localhost:5173
+- **Lovekit PWA:** http://localhost:5175
+- **Locket Love PWA:** http://localhost:5176
 - **API Server:** http://localhost:5001
 - **Storage Service:** http://localhost:5003
 
