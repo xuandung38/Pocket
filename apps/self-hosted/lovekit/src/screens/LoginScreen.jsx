@@ -34,22 +34,31 @@ export default function LoginScreen({ onLogin }) {
     try {
       const res = await loginWithEmail({ email, password, captchaToken: null });
       const data = res?.data ?? res;
-      if (!data?.idToken || !data?.localId) {
+
+      // Firebase signInWithPassword returns camelCase (idToken, localId, refreshToken),
+      // but tolerate snake_case (id_token, user_id, refresh_token) in case BE normalises
+      // the shape downstream.
+      const idToken = data?.idToken || data?.id_token;
+      const localId = data?.localId || data?.user_id;
+      const refreshToken = data?.refreshToken || data?.refresh_token;
+      const displayName = data?.displayName || data?.display_name;
+
+      if (!idToken || !localId) {
         throw new Error("Server không trả về token hợp lệ");
       }
 
       saveToken(
         {
-          idToken: data.idToken,
-          localId: data.localId,
-          refreshToken: data.refreshToken,
+          idToken,
+          localId,
+          refreshToken,
         },
         true,
       );
 
       SonnerSuccess(
         "Đăng nhập thành công!",
-        `Xin chào ${data?.displayName || "bạn"}!`,
+        `Xin chào ${displayName || "bạn"}!`,
       );
 
       hydrate?.();

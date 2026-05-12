@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Toaster } from "sonner";
 import { SocketProvider } from "@/context/SocketContext";
-import { AppProvider } from "@/context/AppContext";
+import { AppProvider, useApp } from "@/context/AppContext";
 import LoginScreen from "@/screens/LoginScreen";
 import CameraScreen from "@/screens/CameraScreen";
 import FeedScreen from "@/screens/FeedScreen";
@@ -13,6 +13,17 @@ import EmojiStudio from "@/components/EmojiStudio";
 import OptionMoment from "@/components/OptionMoment";
 import { useSwipeNav } from "@/hooks/useSwipeNav";
 import { useAuthStore } from "@/stores";
+
+// Closes overlay modals whenever the active screen changes.
+// Must live inside AppProvider to access the shared navigation context.
+function NavCloseEffect({ navState }) {
+  const { navigation, post } = useApp();
+  useEffect(() => {
+    navigation?.setOptionModalOpen?.(false);
+    post?.setShowEmojiPicker?.(false);
+  }, [navState]); // eslint-disable-line react-hooks/exhaustive-deps
+  return null;
+}
 
 function decodeJwtPayload(token) {
   try {
@@ -76,6 +87,15 @@ export default function App() {
     sessionStorage.setItem(NAV_STORAGE_KEY, navState);
   }, [navState]);
 
+  // axios layer dispatches `lk:auth:logout` when refresh fails / 401 cannot be recovered.
+  // We can't navigate to a /login route (this SPA has none), so flip auth state and
+  // LoginScreen renders. Cleanup on unmount + hot-reload prevents duplicate listeners.
+  useEffect(() => {
+    const onLogout = () => setAuthed(false);
+    window.addEventListener("lk:auth:logout", onLogout);
+    return () => window.removeEventListener("lk:auth:logout", onLogout);
+  }, []);
+
   const { onTouchStart, onTouchEnd } = useSwipeNav(navState, setNavState);
 
   const handleBackToCamera = useCallback(() => setNavState("camera"), []);
@@ -102,6 +122,7 @@ export default function App() {
 
   return (
     <AppProvider>
+      <NavCloseEffect navState={navState} />
       <div
         data-theme="lovekit"
         className="h-[100dvh] bg-base-100 text-base-content overflow-hidden"
@@ -117,7 +138,7 @@ export default function App() {
             onTouchEnd={onTouchEnd}
           >
             <div style={screenStyle("camera", navState)}>
-              <CameraScreen isActive={navState === "camera"} />
+              <CameraScreen isActive={navState === "camera"} onNavigate={setNavState} />
             </div>
             <div style={screenStyle("feed", navState)}>
               <FeedScreen onBack={handleBackToCamera} />

@@ -50,16 +50,24 @@ let refreshPromise = null;
 async function refreshIdToken() {
   try {
     const { refreshToken } = getToken();
-    
-    const res = await instanceAuth.post("locket/refresh-token", {
+
+    // Leading slash makes the URL explicit regardless of baseURL trailing slash.
+    const res = await instanceAuth.post("/locket/refresh-token", {
       refreshToken,
     });
-    const newToken = res?.data?.data?.id_token;
-    const newLocalId = res?.data?.data?.user_id;
+
+    // Firebase secureToken v1/token returns snake_case (id_token, user_id, refresh_token).
+    // We still tolerate camelCase in case BE ever normalises the shape.
+    const payload = res?.data?.data ?? res?.data ?? {};
+    const newToken = payload.id_token || payload.idToken;
+    const newLocalId = payload.user_id || payload.localId;
+    const newRefreshToken = payload.refresh_token || payload.refreshToken;
 
     if (newToken) {
       localStorage.setItem("idToken", newToken);
-      localStorage.setItem("localId", newLocalId);
+      if (newLocalId) localStorage.setItem("localId", newLocalId);
+      // Rotate refresh token if BE returns a new one (Firebase usually does)
+      if (newRefreshToken) localStorage.setItem("refreshToken", newRefreshToken);
       cachedExp = null; // Reset lại cache khi nhận token mới
       return newToken;
     }
@@ -82,6 +90,9 @@ async function refreshIdToken() {
 }
 
 // ==== Đăng xuất tập trung ====
+// SPA has no /login route — auth gate is controlled by App.jsx state.
+// Dispatch a custom event so App.jsx can flip `authed` to false and render LoginScreen
+// without a full page reload (which would 404 on `/login`).
 function handleLogout() {
   isRefreshing = false;
   refreshPromise = null;
@@ -93,8 +104,8 @@ function handleLogout() {
   localStorage.removeItem("idToken");
   localStorage.removeItem("localId");
 
-  if (window.location.pathname !== "/login") {
-    window.location.href = "/login";
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("lk:auth:logout"));
   }
 }
 
