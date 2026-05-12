@@ -7,6 +7,7 @@
 //          consumers import from "@/services/socket-service" directly to make
 //          the side-effectful intent obvious at call sites.
 // Phase 7: friend-request flow aliases + findFriendByUserName (request-services).
+// Phase 5: storage + payload services for moment upload (init/finalize) and post.
 export * from "./auth-services";
 export * from "./friend-services";
 export * from "./request-services";
@@ -14,3 +15,5 @@ export * from "./moment-services";
 export * from "./fetch-services";
 export * from "./action-moments";
 export * from "./chat-services";
+export * from "./storage-services";
+export * from "./payload-services";
