@@ -1,4 +1,11 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import clsx from "clsx";
 import { CameraOff } from "lucide-react";
 import EmptyState from "@/components/ui/EmptyState";
@@ -9,6 +16,7 @@ const CameraPreview = forwardRef(function CameraPreview(
 ) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  const cancelledRef = useRef(false);
   const [error, setError] = useState(null);
 
   useImperativeHandle(
@@ -24,57 +32,87 @@ const CameraPreview = forwardRef(function CameraPreview(
     [],
   );
 
+  // Stop any active stream + clear video sink. Safe to call repeatedly.
+  const stop = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }, []);
+
+  // Initialize camera stream. Guarded against duplicate calls + late-arrival
+  // streams after the effect has been cancelled (facingMode change / unmount).
+  const start = useCallback(async () => {
+    if (streamRef.current) return; // already running
+
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setError("Trình duyệt không hỗ trợ camera.");
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode },
+        audio: false,
+      });
+
+      if (cancelledRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+      setError(null);
+    } catch (err) {
+      if (err?.name === "NotAllowedError") {
+        setError("Bạn chưa cho phép truy cập camera.");
+      } else if (err?.name === "NotFoundError") {
+        setError("Không tìm thấy camera.");
+      } else {
+        setError("Không khởi tạo được camera.");
+      }
+    }
+  }, [facingMode]);
+
   useEffect(() => {
     if (!active) return undefined;
 
-    let cancelled = false;
-
-    const start = async () => {
-      try {
-        if (!navigator.mediaDevices?.getUserMedia) {
-          setError("Trình duyệt không hỗ trợ camera.");
-          return;
-        }
-
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode },
-          audio: false,
-        });
-
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-        setError(null);
-      } catch (err) {
-        if (err?.name === "NotAllowedError") {
-          setError("Bạn chưa cho phép truy cập camera.");
-        } else if (err?.name === "NotFoundError") {
-          setError("Không tìm thấy camera.");
-        } else {
-          setError("Không khởi tạo được camera.");
-        }
-      }
-    };
-
+    cancelledRef.current = false;
     start();
 
     return () => {
-      cancelled = true;
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-      }
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
+      cancelledRef.current = true;
+      stop();
+    };
+  }, [active, facingMode, start, stop]);
+
+  // Browsers may release camera tracks when the tab is backgrounded.
+  // On return-to-foreground, ensure we re-acquire the stream so the
+  // preview doesn't stay black until facingMode toggles.
+  useEffect(() => {
+    if (!active) return undefined;
+
+    const onVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      // Drop any orphan track that browser silently stopped, then re-init.
+      const tracks = streamRef.current?.getTracks?.() ?? [];
+      const allEnded = tracks.length > 0 && tracks.every((t) => t.readyState === "ended");
+      if (!streamRef.current || allEnded) {
+        stop();
+        setError(null);
+        start();
       }
     };
-  }, [active, facingMode]);
+
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [active, start, stop]);
 
   if (error) {
     return (

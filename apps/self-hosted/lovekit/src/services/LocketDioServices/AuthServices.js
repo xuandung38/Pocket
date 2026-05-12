@@ -1,5 +1,4 @@
 import { BETA_SERVER_HOST } from "@/config/apiConfig";
-import api from "@/lib/axios";
 import { instanceAuth } from "@/lib/axios.auth";
 import { instanceLocketV2 } from "@/lib/axios.locket";
 import { instanceMain } from "@/lib/axios.main";
@@ -158,30 +157,28 @@ export const logout = async () => {
   }
 };
 
+// Legacy SaaS endpoint — not implemented by self-hosted backend.
+// Returns null gracefully (no throw, no network call) so callers can no-op
+// without polluting the network log with 404s. Remove call sites when safe.
 export const GetUserData = async () => {
-  try {
-    const res = await api.get("/api/me");
-    return res.data?.data;
-  } catch (error) {
-    console.error(
-      "❌ Lỗi khi lấy thông tin người dùng:",
-      error.response?.data || error.message
+  if (import.meta.env?.DEV) {
+    console.warn(
+      "[AuthServices] GetUserData() is a no-op in self-hosted — /api/me not implemented"
     );
-    throw error.response?.data || error.message;
   }
+  return null;
 };
 
+// Legacy SaaS endpoint — see GetUserData note above. Kept for ABI parity
+// with the previous client until consumers (e.g. useAuthStore.fetchUserData)
+// are cleaned up.
 export const GetUserDataV2 = async () => {
-  try {
-    const res = await api.get("/api/po");
-    return res.data?.data;
-  } catch (error) {
-    console.error(
-      "❌ Lỗi khi lấy thông tin người dùng:",
-      error.response?.data || error.message
+  if (import.meta.env?.DEV) {
+    console.warn(
+      "[AuthServices] GetUserDataV2() is a no-op in self-hosted — /api/po not implemented"
     );
-    throw error.response?.data || error.message;
   }
+  return null;
 };
 
 export const GetUserLocket = async () => {
