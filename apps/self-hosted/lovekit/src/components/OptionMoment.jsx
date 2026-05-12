@@ -33,8 +33,10 @@ const OptionMoment = () => {
 
   const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
 
-  const { removeMoment } = useMomentsStoreV2();
-  const { removeUploadItemById } = useUploadQueueStore();
+  // Selector form — avoids re-renders when unrelated slices of the store change.
+  // IMPORTANT: hook calls MUST run before any early-return to satisfy Rules of Hooks.
+  const removeMoment = useMomentsStoreV2((s) => s.removeMoment);
+  const removeUploadItemById = useUploadQueueStore((s) => s.removeUploadItemById);
 
   // Lock body scroll while sheet is open
   useEffect(() => {
@@ -43,6 +45,8 @@ const OptionMoment = () => {
       document.body.style.overflow = "";
     };
   }, [isOptionModalOpen]);
+
+  if (!isOptionModalOpen && !openDeleteConfirm) return null;
 
   // Clear selected moment/queue references after a successful action
   const handleClose = () => {
@@ -56,12 +60,25 @@ const OptionMoment = () => {
     // Branch 1: deleting a published moment via API
     if (selectedMomentId !== null && selectedMomentId !== undefined) {
       try {
+        // Resolve owner uid from the moment itself — `selectedFriendUid` is a
+        // feed filter, not the moment's author. Fall back to the filter only
+        // when the moment record is missing/incomplete.
+        const info = await getMomentById(selectedMomentId);
+        const ownerUid =
+          info?.user ?? info?.userUid ?? info?.owner ?? selectedFriendUid ?? null;
+
         const deletedMoment = await DeleteMoment(selectedMomentId);
         if (deletedMoment === selectedMomentId) {
-          await removeMoment(selectedMomentId, selectedFriendUid);
+          // Store keys moments by both per-owner bucket and "all" bucket;
+          // wipe from both to avoid a stale entry surviving in either view.
+          await removeMoment(selectedMomentId, ownerUid);
+          if (ownerUid !== null) {
+            await removeMoment(selectedMomentId, null);
+          }
           SonnerSuccess("Đã xoá ảnh thành công!");
           handleClose();
         } else {
+          // Delete failed server-side — keep the sheet state so the user can retry.
           SonnerWarning("Xoá không thành công, vui lòng thử lại!");
         }
       } catch (error) {
