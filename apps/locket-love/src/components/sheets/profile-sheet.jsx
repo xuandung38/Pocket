@@ -23,6 +23,8 @@ import {
 import BottomSheet from "./bottom-sheet";
 import Avatar from "../ui/avatar";
 import { currentUser, friends } from "../../data/mock-data";
+import { useAuthStore } from "@/stores";
+import { SonnerError } from "@/components/ui/sonner-toast";
 import {
   EditTextSheet,
   EditPhotoSheet,
@@ -50,8 +52,16 @@ export default function ProfileSheet({ open, onClose }) {
   const closeEdit = () => setActiveEdit(null);
   const navigate = useNavigate();
 
-  function handleLogout() {
-    localStorage.removeItem("locket-auth");
+  async function handleLogout() {
+    // Delegate to the store — clears tokens, cached user, calls server logout.
+    // Even if the server call fails we still want the user routed out, so we
+    // navigate after the store finishes (it always settles isAuth=false).
+    try {
+      await useAuthStore.getState().clearAndLogout();
+    } catch (err) {
+      SonnerError("Đăng xuất gặp lỗi, đã đăng xuất cục bộ.");
+      console.error("[profile-sheet] logout failed:", err);
+    }
     navigate("/login", { replace: true });
   }
 

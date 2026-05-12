@@ -8,8 +8,9 @@
 //   3. Response interceptor catches 401 once, retries with the new token.
 //   4. Any second failure → wipe local data and bounce to /login.
 //
-// Toast notifications (SonnerInfo) are wired up in Phase 2 — for Phase 1 we
-// log to console so the file compiles without a UI dep.
+// Toast notifications now wired through the shared sonner-toast component
+// (added in Phase 2). The interceptor stays UI-framework-agnostic because
+// sonner-toast itself only depends on `sonner` + a mounted <Toaster />.
 
 import { CONFIG } from "@/config";
 import {
@@ -19,19 +20,19 @@ import {
   removeUser,
 } from "@/utils";
 import { parseJwt } from "@/utils/auth";
+import { SonnerInfo } from "@/components/ui/sonner-toast";
 import { instanceAuth } from "./instanceAuth";
 import { createUploadClient } from "./createBase";
 
-// Phase 1 placeholder. Phase 2 replaces with `import { SonnerInfo } from "@/components/ui/SonnerToast"`.
-const SonnerInfo = (message) => {
-  if (typeof window !== "undefined" && message) {
-    // eslint-disable-next-line no-console
-    console.warn("[locket-love]", message);
-  }
-};
-
 // ==== Expiry cache — avoids parsing JWT on every request ====
 let cachedExp = null;
+
+// Reset the cached JWT exp so the next call re-parses the latest idToken.
+// Called from the auth store on logout/login transitions.
+export function resetTokenCache() {
+  cachedExp = null;
+}
+
 function isTokenExpired(token) {
   if (!token) return true;
 
@@ -85,6 +86,13 @@ async function refreshIdToken() {
   }
 }
 
+// Centralized logout when the refresh chain fails.
+//
+// We dispatch `lk:auth:logout` instead of doing window.location.href = "/login"
+// because:
+//   1. Some App.jsx variants gate auth purely on store state (no /login route).
+//   2. A hard navigate wipes the React state we still need (toasts, modals).
+//   3. The store listens for this event and flips isAuth → false reactively.
 function handleLogout() {
   isRefreshing = false;
   refreshPromise = null;
@@ -96,8 +104,8 @@ function handleLogout() {
   localStorage.removeItem("idToken");
   localStorage.removeItem("localId");
 
-  if (typeof window !== "undefined" && window.location.pathname !== "/login") {
-    window.location.href = "/login";
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("lk:auth:logout"));
   }
 }
 

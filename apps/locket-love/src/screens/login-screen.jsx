@@ -1,27 +1,64 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Heart, Eye, EyeOff } from "lucide-react";
+import { Heart, Eye, EyeOff, Loader2 } from "lucide-react";
 
-// Simple login screen — username + password only.
-// Mocked auth: any non-empty pair signs in and navigates to camera.
+import { useAuthStore } from "@/stores";
+import { SonnerError, SonnerSuccess } from "@/components/ui/sonner-toast";
+
+// Login screen — accepts email or phone, routes to the right backend endpoint.
+// On success: hydrates auth store + navigates to camera.
+// On failure: surfaces inline error + toast.
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_RE = /^\+?\d[\d\s().-]{4,}$/;
 
 export default function LoginScreen() {
   const navigate = useNavigate();
+  const login = useAuthStore((s) => s.login);
+
   // identifier = email or phone number — both formats accepted
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const canSubmit = identifier.trim().length > 0 && password.length > 0;
+  const canSubmit =
+    identifier.trim().length > 0 && password.length > 0 && !submitting;
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     if (!canSubmit) return;
-    // Mock auth — accept anything
+
+    const trimmed = identifier.trim();
+    if (!EMAIL_RE.test(trimmed) && !PHONE_RE.test(trimmed)) {
+      setError("Email hoặc số điện thoại không hợp lệ");
+      return;
+    }
+
     setError("");
-    localStorage.setItem("locket-auth", "1");
-    navigate("/", { replace: true });
+    setSubmitting(true);
+    try {
+      const user = await login({ identifier: trimmed, password, rememberMe: true });
+      SonnerSuccess(
+        "Đăng nhập thành công!",
+        user?.displayName ? `Xin chào ${user.displayName}!` : undefined,
+      );
+      navigate("/", { replace: true });
+    } catch (err) {
+      const status = err?.status;
+      let msg;
+      if (status === 400) msg = "Tài khoản hoặc mật khẩu không đúng!";
+      else if (status === 401) msg = "Phiên đăng nhập đã hết hạn.";
+      else if (status === 404) msg = "Tài khoản không tồn tại!";
+      else if (status === 429) msg = "Bạn thử quá nhiều lần. Vui lòng đợi.";
+      else if (status >= 500) msg = "Lỗi máy chủ. Thử lại sau!";
+      else msg = err?.message || "Đăng nhập thất bại!";
+      setError(msg);
+      SonnerError(msg);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -86,6 +123,7 @@ export default function LoginScreen() {
           gap: 12,
           paddingBottom: 40,
         }}
+        noValidate
       >
         <input
           type="text"
@@ -96,6 +134,7 @@ export default function LoginScreen() {
           placeholder="Email hoặc số điện thoại"
           value={identifier}
           onChange={(e) => setIdentifier(e.target.value)}
+          disabled={submitting}
           style={inputStyle}
         />
         <div style={{ position: "relative" }}>
@@ -105,6 +144,7 @@ export default function LoginScreen() {
             placeholder="Mật khẩu"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            disabled={submitting}
             style={{ ...inputStyle, paddingRight: 48 }}
           />
           <button
@@ -146,9 +186,20 @@ export default function LoginScreen() {
             fontWeight: 700,
             cursor: canSubmit ? "pointer" : "default",
             marginTop: 8,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
           }}
         >
-          Đăng nhập
+          {submitting ? (
+            <>
+              <Loader2 size={18} className="animate-spin" />
+              <span>Đang đăng nhập…</span>
+            </>
+          ) : (
+            "Đăng nhập"
+          )}
         </button>
       </form>
     </div>
