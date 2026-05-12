@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ChevronRight,
@@ -22,8 +22,7 @@ import {
 } from "lucide-react";
 import BottomSheet from "./bottom-sheet";
 import Avatar from "../ui/avatar";
-import { currentUser, friends } from "../../data/mock-data";
-import { useAuthStore } from "@/stores";
+import { useAuthStore, useFriendStoreV2 } from "@/stores";
 import { SonnerError } from "@/components/ui/sonner-toast";
 import {
   EditTextSheet,
@@ -35,12 +34,62 @@ import {
 // Follows the mock-up: profile header → utilities → settings sections.
 // Edit sheets render as siblings so they layer on top of this sheet.
 
+// Derive a display name from the auth user payload. The backend may surface
+// any of `displayName`, `first_name`, or the raw uid — fall back gracefully.
+function pickDisplayName(user) {
+  if (!user) return "Bạn";
+  const composed = [user.first_name, user.last_name]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  return (
+    user.displayName ||
+    composed ||
+    user.name ||
+    user.username ||
+    "Bạn"
+  );
+}
+
+// Username slug used under the profile header (`locket.cam/<slug>`).
+// Falls back to a sanitised display name when the BE doesn't provide one.
+function pickUsername(user, fallbackName) {
+  const raw =
+    user?.username ||
+    user?.handle ||
+    user?.first_name ||
+    fallbackName ||
+    "user";
+  return String(raw).replace(/^@+/, "").toLowerCase().replace(/\s+/g, "");
+}
+
 export default function ProfileSheet({ open, onClose }) {
-  // Editable profile fields — start from currentUser
-  const [name, setName] = useState(currentUser.name);
+  const user = useAuthStore((s) => s.user);
+  const friends = useFriendStoreV2((s) => s.friends);
+  const pendingIn = useFriendStoreV2((s) => s.pendingIn);
+  const pendingOut = useFriendStoreV2((s) => s.pendingOut);
+  const friendsLoading = useFriendStoreV2((s) => s.loading);
+  const loadFriends = useFriendStoreV2((s) => s.loadFriends);
+
+  // Lazy-load the friend graph the first time the sheet opens — keeps cold
+  // startup light when the user never opens this sheet.
+  useEffect(() => {
+    if (!open) return;
+    if (!friends?.length && !friendsLoading) loadFriends?.();
+  }, [open, friends?.length, friendsLoading, loadFriends]);
+
+  const displayName = pickDisplayName(user);
+  const username = pickUsername(user, displayName);
+  const userAvatar =
+    user?.profilePicture || user?.profile_picture_url || user?.avatar || null;
+
+  // Editable profile fields — start from the auth user payload. We mirror the
+  // live store value into local state on first open so edit sheets can mutate
+  // optimistically without thrashing the auth store.
+  const [name, setName] = useState(displayName);
   const [birthday, setBirthday] = useState("");
-  const [email, setEmail] = useState("");
-  const [avatarSrc, setAvatarSrc] = useState(currentUser.avatar);
+  const [email, setEmail] = useState(user?.email || "");
+  const [avatarSrc, setAvatarSrc] = useState(userAvatar);
   const [notifs, setNotifs] = useState({
     moments: true,
     chats: true,
@@ -51,6 +100,14 @@ export default function ProfileSheet({ open, onClose }) {
   const [activeEdit, setActiveEdit] = useState(null);
   const closeEdit = () => setActiveEdit(null);
   const navigate = useNavigate();
+
+  // When the auth user changes (login / profile refresh) sync the editable
+  // local fields so the sheet stays accurate without forcing a remount.
+  useEffect(() => {
+    setName(displayName);
+    setEmail(user?.email || "");
+    setAvatarSrc(userAvatar);
+  }, [displayName, user?.email, userAvatar]);
 
   async function handleLogout() {
     // Delegate to the store — clears tokens, cached user, calls server logout.
@@ -76,9 +133,13 @@ export default function ProfileSheet({ open, onClose }) {
             scrollbarWidth: "none",
           }}
         >
-          <ProfileHeader name={name} avatar={avatarSrc} />
-          <ActionRow />
-          <WidgetSection />
+          <ProfileHeader name={name} avatar={avatarSrc} username={username} />
+          <ActionRow
+            friendCount={friends?.length || 0}
+            pendingInCount={pendingIn?.length || 0}
+            pendingOutCount={pendingOut?.length || 0}
+          />
+          <WidgetSection friends={friends || []} />
           <SectionGroup label="Tổng quát">
             <Row
               icon={<Bell size={20} color="#fff" />}
@@ -186,7 +247,7 @@ export default function ProfileSheet({ open, onClose }) {
   );
 }
 
-function ProfileHeader({ name, avatar }) {
+function ProfileHeader({ name, avatar, username }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "8px 0 12px" }}>
       <div
@@ -209,19 +270,24 @@ function ProfileHeader({ name, avatar }) {
           marginTop: 2,
         }}
       >
-        locket.cam/{currentUser.username.replace("@", "")}
+        locket.cam/{username}
         <span style={{ opacity: 0.6 }}>🔗</span>
       </div>
     </div>
   );
 }
 
-function ActionRow() {
+function ActionRow({ friendCount, pendingInCount, pendingOutCount }) {
+  // Surface pending friend-request counts as a subtle badge on the Friends
+  // pill — primary cue is incoming, secondary is outgoing. Hidden when zero.
+  const pending = (pendingInCount || 0) + (pendingOutCount || 0);
+
   return (
     <div style={{ display: "flex", gap: 10, marginTop: 12, marginBottom: 16 }}>
       <button
         style={{
           flex: 1,
+          position: "relative",
           background: "var(--bg-elevated)",
           border: "none",
           borderRadius: 16,
@@ -237,7 +303,30 @@ function ActionRow() {
         }}
       >
         <UsersIcon size={18} />
-        {friends.length} Friends
+        {friendCount} Friends
+        {pending > 0 && (
+          <span
+            aria-label={`${pendingInCount} đang chờ, ${pendingOutCount} đã gửi`}
+            style={{
+              position: "absolute",
+              top: 6,
+              right: 10,
+              minWidth: 22,
+              height: 22,
+              padding: "0 6px",
+              borderRadius: 999,
+              background: "var(--accent-yellow, #f5a623)",
+              color: "#000",
+              fontSize: 12,
+              fontWeight: 700,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {pending}
+          </span>
+        )}
       </button>
       <button
         style={{
@@ -263,7 +352,7 @@ function ActionRow() {
   );
 }
 
-function WidgetSection() {
+function WidgetSection({ friends }) {
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", marginBottom: 12 }}>
@@ -288,14 +377,23 @@ function WidgetSection() {
         </button>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
-        <WidgetTile label="Mọi người" actionLabel="Sửa" preview="people" />
-        <WidgetTile label="" actionLabel="Tạo" preview="add" />
+        <WidgetTile label="Mọi người" actionLabel="Sửa" preview="people" friends={friends} />
+        <WidgetTile label="" actionLabel="Tạo" preview="add" friends={friends} />
       </div>
     </>
   );
 }
 
-function WidgetTile({ label, actionLabel, preview }) {
+function WidgetTile({ label, actionLabel, preview, friends = [] }) {
+  // Backend friend shape uses `firstName`/`profilePic`; legacy shape used
+  // `name`/`avatar`. Read both so the tile stays robust through the rename.
+  const previewName = (f) =>
+    [f?.firstName, f?.lastName].filter(Boolean).join(" ").trim() ||
+    f?.name ||
+    f?.username ||
+    "?";
+  const previewSrc = (f) => f?.profilePic || f?.avatar || null;
+
   return (
     <div
       style={{
@@ -312,9 +410,9 @@ function WidgetTile({ label, actionLabel, preview }) {
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
         {preview === "people" ? (
           <div style={{ display: "flex" }}>
-            <Avatar src={friends[0]?.avatar} name="A" size={42} />
+            <Avatar src={previewSrc(friends[0])} name={previewName(friends[0])} size={42} />
             <div style={{ marginLeft: -10 }}>
-              <Avatar src={friends[1]?.avatar} name="B" size={42} />
+              <Avatar src={previewSrc(friends[1])} name={previewName(friends[1])} size={42} />
             </div>
           </div>
         ) : (

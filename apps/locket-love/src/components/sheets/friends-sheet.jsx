@@ -1,19 +1,17 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search, X, ChevronRight, UserPlus } from "lucide-react";
 import BottomSheet from "./bottom-sheet";
 import Avatar from "../ui/avatar";
-import { friends, searchableUsers, FRIENDS_LIMIT } from "../../data/mock-data";
+import { useAuthStore, useFriendStoreV2 } from "@/stores";
+import { FRIENDS_LIMIT } from "../../data/mock-data";
 
 // Friend invite/manage sheet — opens when tapping the "X người bạn" pill on camera screen.
-// Empty search → shows current friends + share options.
-// Non-empty search → shows matching searchable users with "+ Thêm" buttons.
-
-const APP_LINKS = [
-  { id: "messenger", label: "Messenger", icon: "💬", color: "#0078ff" },
-  { id: "insta", label: "Insta", icon: "📷", color: "#e4405f" },
-  { id: "imessage", label: "Tin nhắn", icon: "💚", color: "#34c759" },
-  { id: "other", label: "Khác", icon: "🔗", color: "#3a3a3c" },
-];
+// Wired to useFriendStoreV2 in Phase 4:
+//   - Default view → real friends + pending request lists from the store.
+//   - Search view → currently disabled (BE search shipped in Phase 7).
+//
+// We keep the share-link section static since those are deep-links, not API
+// driven.
 
 const SHARE_TARGETS = [
   { id: "messenger", label: "Messenger", icon: "💬", color: "#0078ff" },
@@ -22,28 +20,61 @@ const SHARE_TARGETS = [
   { id: "imessage", label: "Tin nhắn", icon: "💚", color: "#34c759" },
 ];
 
+// Normalize a friend record (or pending-request entry) into the shape this
+// sheet renders. Tolerates both the V2 normalized shape (`firstName`, `profilePic`)
+// and legacy mock shape (`name`, `avatar`).
+function presentFriend(f, fallbackName) {
+  const composed = [f?.firstName, f?.lastName].filter(Boolean).join(" ").trim();
+  return {
+    uid: f?.uid || f?.id || "",
+    name: composed || f?.name || f?.username || fallbackName || "Người dùng",
+    username: f?.username || "",
+    avatar: f?.profilePic || f?.avatar || null,
+  };
+}
+
 export default function FriendsSheet({ open, onClose }) {
   const [query, setQuery] = useState("");
-  const [addedIds, setAddedIds] = useState([]);
 
-  // When sheet closes, reset transient state
+  const friends = useFriendStoreV2((s) => s.friends);
+  const pendingIn = useFriendStoreV2((s) => s.pendingIn);
+  const pendingOut = useFriendStoreV2((s) => s.pendingOut);
+  const friendsLoading = useFriendStoreV2((s) => s.loading);
+  const loadFriends = useFriendStoreV2((s) => s.loadFriends);
+  const acceptRequest = useFriendStoreV2((s) => s.acceptRequest);
+  const denyRequest = useFriendStoreV2((s) => s.denyRequest);
+  const cancelRequest = useFriendStoreV2((s) => s.cancelRequest);
+  const removeFriendLocal = useFriendStoreV2((s) => s.removeFriendLocal);
+
+  const user = useAuthStore((s) => s.user);
+
+  // Load the friend graph the first time the sheet opens. Subsequent opens
+  // re-use the cached store state — no thrash.
+  useEffect(() => {
+    if (!open) return;
+    if (!friends?.length && !friendsLoading) loadFriends?.();
+  }, [open, friends?.length, friendsLoading, loadFriends]);
+
+  // Reset transient state after the sheet finishes its close animation. The
+  // 350ms delay matches the BottomSheet exit timing — touching state earlier
+  // causes a flash of an empty list during the slide-out.
   function handleClose() {
     onClose();
-    setTimeout(() => {
-      setQuery("");
-      setAddedIds([]);
-    }, 350);
+    setTimeout(() => setQuery(""), 350);
   }
 
   const trimmed = query.trim().toLowerCase();
-  const searchResults = useMemo(() => {
-    if (!trimmed) return [];
-    return searchableUsers.filter(
-      (u) =>
-        u.name.toLowerCase().includes(trimmed) ||
-        u.username.toLowerCase().includes(trimmed)
-    );
-  }, [trimmed]);
+  const filteredFriends = useMemo(() => {
+    if (!friends?.length) return [];
+    if (!trimmed) return friends;
+    return friends.filter((f) => {
+      const name = [f.firstName, f.lastName].filter(Boolean).join(" ").trim().toLowerCase();
+      const uname = (f.username || "").toLowerCase();
+      return name.includes(trimmed) || uname.includes(trimmed);
+    });
+  }, [friends, trimmed]);
+
+  const friendCount = friends?.length || 0;
 
   return (
     <BottomSheet open={open} onClose={handleClose}>
@@ -51,14 +82,17 @@ export default function FriendsSheet({ open, onClose }) {
         {/* Header — count + subtitle */}
         <div style={{ textAlign: "center", padding: "8px 0 14px" }}>
           <div style={{ fontSize: 22, fontWeight: 700 }}>
-            {friends.length} / {FRIENDS_LIMIT} người bạn
+            {friendCount} / {FRIENDS_LIMIT} người bạn
           </div>
           <div style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 4 }}>
-            Mời một người bạn để tiếp tục
+            {pendingIn?.length > 0
+              ? `${pendingIn.length} lời mời đang chờ`
+              : "Mời một người bạn để tiếp tục"}
           </div>
         </div>
 
-        {/* Search input */}
+        {/* Search input — filters the in-memory friend list. Cross-account
+            user search lands in Phase 7 when the BE search endpoint is wired. */}
         <div
           style={{
             display: "flex",
@@ -74,7 +108,7 @@ export default function FriendsSheet({ open, onClose }) {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Thêm một người bạn mới"
+            placeholder="Tìm bạn theo tên hoặc @username"
             style={{
               flex: 1,
               background: "none",
@@ -102,13 +136,32 @@ export default function FriendsSheet({ open, onClose }) {
           )}
         </div>
 
-        {trimmed ? (
-          <SearchResults results={searchResults} addedIds={addedIds} onAdd={(id) => setAddedIds((p) => [...p, id])} />
-        ) : (
-          <DefaultContent />
+        {/* Incoming friend requests — actionable accept/deny */}
+        {pendingIn?.length > 0 && (
+          <PendingIncomingSection
+            requests={pendingIn}
+            onAccept={acceptRequest}
+            onDeny={denyRequest}
+          />
         )}
 
-        {/* Share-link section — always visible */}
+        {/* Outgoing friend requests — show with cancel option */}
+        {pendingOut?.length > 0 && (
+          <PendingOutgoingSection
+            requests={pendingOut}
+            onCancel={cancelRequest}
+          />
+        )}
+
+        {/* Friend list — real data from store. Loading shimmer on cold load. */}
+        <FriendsSection
+          friends={filteredFriends}
+          loading={friendsLoading}
+          hasSearch={Boolean(trimmed)}
+          onRemove={removeFriendLocal}
+        />
+
+        {/* Share-link section — always visible (deep-links, no API) */}
         <SectionLabel icon={<ShareIcon />} text="Chia sẻ liên kết Locket của bạn" />
         <div style={{ display: "flex", flexDirection: "column" }}>
           {SHARE_TARGETS.map((t) => (
@@ -132,111 +185,210 @@ export default function FriendsSheet({ open, onClose }) {
             </button>
           ))}
         </div>
+
+        {/* User's own share slug — falls back to "user" if BE didn't provide one */}
+        {user?.username && (
+          <div
+            style={{
+              marginTop: 12,
+              padding: "10px 14px",
+              borderRadius: 12,
+              background: "var(--bg-elevated)",
+              color: "var(--text-secondary)",
+              fontSize: 13,
+              textAlign: "center",
+            }}
+          >
+            locket.cam/{String(user.username).replace(/^@+/, "")}
+          </div>
+        )}
       </div>
     </BottomSheet>
   );
 }
 
-function SearchResults({ results, addedIds, onAdd }) {
+// ---------- Section components -----------------------------------------
+
+function PendingIncomingSection({ requests, onAccept, onDeny }) {
   return (
     <>
-      <SectionLabel icon={<UserPlus size={18} color="var(--text-secondary)" />} text="Thêm theo tên người dùng" />
-      {results.length === 0 ? (
-        <div style={{ padding: "16px 0 24px", textAlign: "center", color: "var(--text-secondary)", fontSize: 14 }}>
-          Không tìm thấy người dùng
-        </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", marginBottom: 24 }}>
-          {results.map((u) => {
-            const added = addedIds.includes(u.id);
-            return (
-              <div
-                key={u.id}
-                style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0" }}
-              >
-                <Avatar src={u.avatar} name={u.name} size={44} />
-                <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-                  <span style={{ fontSize: 15, fontWeight: 600 }}>{u.name}</span>
-                  <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>{u.username}</span>
-                </div>
+      <SectionLabel
+        icon={<UserPlus size={18} color="var(--text-secondary)" />}
+        text={`Lời mời đang chờ (${requests.length})`}
+      />
+      <div style={{ display: "flex", flexDirection: "column", marginBottom: 22 }}>
+        {requests.map((r) => {
+          const p = presentFriend(r, "Người dùng");
+          return (
+            <div
+              key={`in-${p.uid}`}
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0" }}
+            >
+              <Avatar src={p.avatar} name={p.name} size={44} />
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+                <span style={{ fontSize: 15, fontWeight: 600 }}>{p.name}</span>
+                {p.username && (
+                  <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+                    @{p.username}
+                  </span>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
                 <button
-                  onClick={() => !added && onAdd(u.id)}
-                  disabled={added}
+                  onClick={() => onAccept?.(p.uid)}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
-                    background: added ? "var(--bg-elevated)" : "var(--accent-yellow)",
-                    color: added ? "var(--text-secondary)" : "#000",
+                    background: "var(--accent-yellow)",
+                    color: "#000",
                     border: "none",
                     borderRadius: 999,
-                    padding: "8px 16px",
-                    fontSize: 14,
+                    padding: "8px 14px",
+                    fontSize: 13,
                     fontWeight: 700,
-                    cursor: added ? "default" : "pointer",
+                    cursor: "pointer",
                   }}
                 >
-                  {added ? "Đã gửi" : "+ Thêm"}
+                  Chấp nhận
+                </button>
+                <button
+                  onClick={() => onDeny?.(p.uid)}
+                  aria-label="Từ chối"
+                  style={{
+                    background: "var(--bg-elevated)",
+                    color: "var(--text-secondary)",
+                    border: "none",
+                    borderRadius: 999,
+                    padding: 8,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  <X size={16} />
                 </button>
               </div>
-            );
-          })}
-        </div>
-      )}
+            </div>
+          );
+        })}
+      </div>
     </>
   );
 }
 
-function DefaultContent() {
+function PendingOutgoingSection({ requests, onCancel }) {
   return (
     <>
-      <SectionLabel icon={<span style={{ fontSize: 18 }}>👥</span>} text="Find friends from other apps" />
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          gap: 8,
-          padding: "12px",
-          background: "var(--bg-elevated)",
-          borderRadius: 16,
-          marginBottom: 22,
-        }}
-      >
-        {APP_LINKS.map((a) => (
-          <div
-            key={a.id}
-            style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}
-          >
-            <AppIcon icon={a.icon} color={a.color} size={48} />
-            <span style={{ fontSize: 12, fontWeight: 600 }}>{a.label}</span>
-          </div>
-        ))}
+      <SectionLabel
+        icon={<span style={{ fontSize: 16 }}>✉️</span>}
+        text={`Đã gửi (${requests.length})`}
+      />
+      <div style={{ display: "flex", flexDirection: "column", marginBottom: 22 }}>
+        {requests.map((r) => {
+          const p = presentFriend(r, "Người dùng");
+          return (
+            <div
+              key={`out-${p.uid}`}
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0" }}
+            >
+              <Avatar src={p.avatar} name={p.name} size={44} />
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+                <span style={{ fontSize: 15, fontWeight: 600 }}>{p.name}</span>
+                {p.username && (
+                  <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+                    @{p.username}
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => onCancel?.(p.uid)}
+                style={{
+                  background: "var(--bg-elevated)",
+                  color: "var(--text-secondary)",
+                  border: "none",
+                  borderRadius: 999,
+                  padding: "8px 14px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Huỷ
+              </button>
+            </div>
+          );
+        })}
       </div>
+    </>
+  );
+}
 
+function FriendsSection({ friends, loading, hasSearch, onRemove }) {
+  if (loading && friends.length === 0) {
+    return (
+      <>
+        <SectionLabel icon={<span style={{ fontSize: 16 }}>👫</span>} text="Bạn bè của bạn" />
+        <div
+          style={{
+            padding: "20px 0",
+            textAlign: "center",
+            color: "var(--text-secondary)",
+            fontSize: 14,
+          }}
+        >
+          Đang tải danh sách bạn bè...
+        </div>
+      </>
+    );
+  }
+
+  if (friends.length === 0) {
+    return (
+      <>
+        <SectionLabel icon={<span style={{ fontSize: 16 }}>👫</span>} text="Bạn bè của bạn" />
+        <div
+          style={{
+            padding: "20px 0",
+            textAlign: "center",
+            color: "var(--text-secondary)",
+            fontSize: 14,
+          }}
+        >
+          {hasSearch ? "Không tìm thấy bạn nào khớp." : "Chưa có bạn bè."}
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
       <SectionLabel icon={<span style={{ fontSize: 16 }}>👫</span>} text="Bạn bè của bạn" />
       <div style={{ display: "flex", flexDirection: "column", marginBottom: 22 }}>
-        {friends.map((f) => (
-          <div
-            key={f.id}
-            style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0" }}
-          >
-            <div style={{ borderRadius: "50%", padding: 2, border: "2px solid var(--accent-yellow)" }}>
-              <Avatar src={f.avatar} name={f.name} size={40} />
-            </div>
-            <span style={{ flex: 1, fontSize: 15, fontWeight: 600 }}>{f.name}</span>
-            <button
-              style={{
-                background: "none",
-                border: "none",
-                color: "var(--text-secondary)",
-                cursor: "pointer",
-                padding: 6,
-              }}
+        {friends.map((f) => {
+          const p = presentFriend(f);
+          return (
+            <div
+              key={p.uid || `friend-${p.name}`}
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0" }}
             >
-              <X size={20} />
-            </button>
-          </div>
-        ))}
+              <div style={{ borderRadius: "50%", padding: 2, border: "2px solid var(--accent-yellow)" }}>
+                <Avatar src={p.avatar} name={p.name} size={40} />
+              </div>
+              <span style={{ flex: 1, fontSize: 15, fontWeight: 600 }}>{p.name}</span>
+              <button
+                onClick={() => onRemove?.(p.uid)}
+                aria-label={`Xoá ${p.name}`}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--text-secondary)",
+                  cursor: "pointer",
+                  padding: 6,
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+          );
+        })}
       </div>
     </>
   );

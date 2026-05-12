@@ -4,17 +4,111 @@ import { Bell, Plus, ArrowUp } from "lucide-react";
 
 // At the top of the feed, an upward wheel/swipe goes back to camera (mirrors camera→feed)
 const PULL_BACK_THRESHOLD = 50;
+
 import Avatar from "../components/ui/avatar";
 import AudiencePicker from "../components/ui/audience-picker";
 import BottomNav from "../components/ui/bottom-nav";
 import BottomSheet from "../components/sheets/bottom-sheet";
 import ProfileSheet from "../components/sheets/profile-sheet";
-import { currentUser, feedMoments } from "../data/mock-data";
+import FriendMomentRow from "../components/friend-moment-row";
+import {
+  useAuthStore,
+  useFriendStoreV2,
+  useMomentsStoreV2,
+  selectMomentsArray,
+} from "@/stores";
 
-// Overlay for replying to a friend's moment — blurred photo background + bottom input.
-// Mirrors BottomSheet's mount/unmount-with-animation pattern (see docs/design-patterns.md §2.3).
+// -------------------------------------------------------------------------
+// Backend moment shape varies across endpoints/proxies — read defensively.
+// -------------------------------------------------------------------------
+const getMomentOwnerUid = (m) => m?.user ?? m?.userUid ?? m?.owner;
+const getMomentImage = (m) =>
+  m?.thumbnailUrl || m?.thumbnail_url || m?.image_url || m?.image || null;
+const getMomentVideo = (m) => m?.videoUrl || m?.video_url || null;
+const getMomentCaption = (m) => m?.caption || "";
+const getMomentTimestampMs = (m) => {
+  // Try numeric epoch (createTime) first, then ISO string, fallback 0.
+  const numeric = Number(m?.createTime ?? m?.create_time);
+  if (Number.isFinite(numeric) && numeric > 0) return numeric;
+  const parsed = Date.parse(m?.date ?? "");
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+const getMomentDateKey = (m) => {
+  // Reduce to a YYYY-MM-DD bucket so the ?date= filter matches reliably even
+  // when the backend returns full ISO timestamps.
+  const ts = getMomentTimestampMs(m);
+  if (!ts) return m?.date ?? null;
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return null;
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+// Best-effort "x phút/giờ/ngày trước" formatter — keeps native Locket feel.
+function formatTimeAgo(ts) {
+  if (!ts) return "";
+  const diff = Date.now() - ts;
+  if (diff < 60_000) return "vừa xong";
+  const m = Math.floor(diff / 60_000);
+  if (m < 60) return `${m}p`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}g`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}ngày`;
+  const date = new Date(ts);
+  return `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+// Compose a display name out of normalized friend shape; falls back gracefully.
+function friendDisplayName(friend) {
+  if (!friend) return "";
+  const combined = [friend.firstName, friend.lastName].filter(Boolean).join(" ").trim();
+  return combined || friend.username || friend.name || "";
+}
+
+// Resolve the author meta for a moment from store + auth user.
+function resolveAuthor({ ownerUid, friendsByUid, meUid, me }) {
+  if (ownerUid && ownerUid === meUid) {
+    return {
+      id: meUid,
+      name: me?.displayName || me?.first_name || me?.name || "Bạn",
+      avatar: me?.profilePicture || me?.profile_picture_url || me?.avatar || null,
+    };
+  }
+  const friend = ownerUid ? friendsByUid[ownerUid] : null;
+  if (friend) {
+    return {
+      id: friend.uid,
+      name: friendDisplayName(friend) || "Người dùng",
+      avatar: friend.profilePic || null,
+    };
+  }
+  return { id: ownerUid || "unknown", name: "Người dùng", avatar: null };
+}
+
+// Filter a sorted moment list by audience + optional date string.
+// `audience`: "all" | "owner" | <friendUid>
+// `date`: "YYYY-MM-DD" | null
+function filterMoments(list, audience, date, meUid) {
+  let out = list;
+  if (audience === "owner") {
+    out = out.filter((m) => getMomentOwnerUid(m) === meUid);
+  } else if (audience !== "all") {
+    out = out.filter((m) => getMomentOwnerUid(m) === audience);
+  }
+  if (date) {
+    out = out.filter((m) => getMomentDateKey(m) === date);
+  }
+  return out;
+}
+
+// ----------------------- Reply overlay (unchanged UX) -----------------------
+// Slide-up bottom input shown when tapping a friend's "Gửi tin nhắn..." row.
+// Mirrors BottomSheet's mount-then-exit animation pattern.
 const REPLY_EXIT_DURATION = 280;
-function ReplyOverlay({ moment, onClose }) {
+function ReplyOverlay({ moment, authorName, image, onClose }) {
   const open = !!moment;
   const [mounted, setMounted] = useState(open);
   const [closing, setClosing] = useState(false);
@@ -47,21 +141,20 @@ function ReplyOverlay({ moment, onClose }) {
         overflow: "hidden",
       }}
     >
-      {/* Blurred photo backdrop — heavy darken so the input pops */}
       <div
         className={closing ? "animate-fade-out" : "animate-fade-in"}
         onClick={onClose}
         style={{
           position: "absolute",
           inset: 0,
-          backgroundImage: `url(${moment.image})`,
+          backgroundImage: image ? `url(${image})` : "none",
+          backgroundColor: "#000",
           backgroundSize: "cover",
           backgroundPosition: "center",
           filter: "blur(20px) brightness(0.45)",
           transform: "scale(1.1)",
         }}
       />
-      {/* Bottom input row — slides up with the overlay */}
       <div
         className={closing ? "animate-slide-down" : "animate-slide-up"}
         style={{
@@ -88,7 +181,7 @@ function ReplyOverlay({ moment, onClose }) {
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => e.key === "Escape" && onClose()}
-            placeholder={`Trả lời ${moment.author.name.split(" ").slice(0, 2).join(" ")}...`}
+            placeholder={`Trả lời ${(authorName || "").split(" ").slice(0, 2).join(" ")}...`}
             style={{
               flex: 1,
               background: "none",
@@ -124,17 +217,6 @@ function ReplyOverlay({ moment, onClose }) {
   );
 }
 
-// Filter moments by audience selection + optional date filter.
-// audience: "all" | "owner" | <friendId>
-// date: "YYYY-MM-DD" | null (null = no date filter)
-function filterMoments(audience, date) {
-  let result = feedMoments;
-  if (audience === "owner") result = result.filter((m) => m.author.id === currentUser.id);
-  else if (audience !== "all") result = result.filter((m) => m.author.id === audience);
-  if (date) result = result.filter((m) => m.date === date);
-  return result;
-}
-
 // Common emoji list shown in the "+" picker — covers Locket's typical reactions
 const EMOJI_REACTIONS = [
   "🔥", "😍", "❤️", "🙁", "😂", "😮",
@@ -142,8 +224,33 @@ const EMOJI_REACTIONS = [
   "💀", "💯", "🙌", "😭", "🤔", "👀",
 ];
 
-function MomentCard({ moment, onOpenReply, onOpenReactions, onSendQuickReaction, onOpenEmojiPicker }) {
-  const isOwn = moment.author.id === currentUser.id;
+// Default emoji set rendered on the "Gửi tin nhắn..." row when the backend
+// hasn't shipped per-moment reaction suggestions yet.
+const DEFAULT_QUICK_REACTIONS = ["🔥", "😍", "❤️"];
+
+function MomentCard({
+  moment,
+  meUid,
+  author,
+  onOpenReply,
+  onOpenReactions,
+  onSendQuickReaction,
+  onOpenEmojiPicker,
+}) {
+  const ownerUid = getMomentOwnerUid(moment);
+  const isOwn = ownerUid && ownerUid === meUid;
+  const image = getMomentImage(moment);
+  const video = getMomentVideo(moment);
+  const caption = getMomentCaption(moment);
+  const ts = getMomentTimestampMs(moment);
+  const timeAgo = formatTimeAgo(ts);
+  const quickReactions = Array.isArray(moment.reactions) && moment.reactions.length > 0
+    ? moment.reactions
+    : DEFAULT_QUICK_REACTIONS;
+  const reactionCount = Array.isArray(moment.reactionList)
+    ? moment.reactionList.length
+    : moment.reactionsCount || 0;
+
   return (
     <div
       style={{
@@ -158,7 +265,7 @@ function MomentCard({ moment, onOpenReply, onOpenReactions, onSendQuickReaction,
         boxSizing: "border-box",
       }}
     >
-      {/* Square photo card */}
+      {/* Square media card — video preferred when available, else still image */}
       <div
         style={{
           position: "relative",
@@ -169,12 +276,39 @@ function MomentCard({ moment, onOpenReply, onOpenReactions, onSendQuickReaction,
         }}
       >
         <div style={{ position: "absolute", inset: 0 }}>
-          <img
-            src={moment.image}
-            alt={moment.caption}
-            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-          />
-          {moment.caption && (
+          {video ? (
+            <video
+              src={video}
+              poster={image || undefined}
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+              muted
+              loop
+              playsInline
+              preload="metadata"
+            />
+          ) : image ? (
+            <img
+              src={image}
+              alt={caption || "Moment"}
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+              loading="lazy"
+            />
+          ) : (
+            <div
+              style={{
+                width: "100%",
+                height: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--text-secondary)",
+                fontSize: 13,
+              }}
+            >
+              Không có ảnh
+            </div>
+          )}
+          {caption && (
             <div
               style={{
                 position: "absolute",
@@ -189,9 +323,12 @@ function MomentCard({ moment, onOpenReply, onOpenReactions, onSendQuickReaction,
                 fontWeight: 700,
                 color: "#fff",
                 whiteSpace: "nowrap",
+                maxWidth: "85%",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
               }}
             >
-              {moment.caption}
+              {caption}
             </div>
           )}
         </div>
@@ -199,11 +336,11 @@ function MomentCard({ moment, onOpenReply, onOpenReactions, onSendQuickReaction,
 
       {/* Author row */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 4px 8px" }}>
-        <Avatar src={moment.author.avatar} name={moment.author.name} size={28} />
+        <Avatar src={author.avatar} name={author.name} size={28} />
         <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", flex: 1 }}>
-          {isOwn ? "Bạn" : moment.author.name}
+          {isOwn ? "Bạn" : author.name}
         </span>
-        <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{moment.timeAgo}</span>
+        <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{timeAgo}</span>
       </div>
 
       {/* Conditional control area */}
@@ -216,9 +353,9 @@ function MomentCard({ moment, onOpenReply, onOpenReactions, onSendQuickReaction,
           >
             <span>⚡</span>
             <span>Hoạt động</span>
-            {moment.reactionList?.length > 0 && (
+            {reactionCount > 0 && (
               <span style={{ marginLeft: 6, color: "var(--text-secondary)", fontWeight: 500 }}>
-                {moment.reactionList.length}
+                {reactionCount}
               </span>
             )}
           </button>
@@ -234,7 +371,6 @@ function MomentCard({ moment, onOpenReply, onOpenReactions, onSendQuickReaction,
             marginBottom: 12,
           }}
         >
-          {/* Text area — only this opens the reply overlay */}
           <span
             onClick={onOpenReply}
             style={{ flex: 1, fontSize: 15, color: "var(--text-secondary)", cursor: "pointer" }}
@@ -242,8 +378,7 @@ function MomentCard({ moment, onOpenReply, onOpenReactions, onSendQuickReaction,
             Gửi tin nhắn...
           </span>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {/* Quick-reaction emojis — tap sends immediately, no popup */}
-            {moment.reactions.map((e) => (
+            {quickReactions.map((e) => (
               <button
                 key={e}
                 onClick={() => onSendQuickReaction(e)}
@@ -259,7 +394,6 @@ function MomentCard({ moment, onOpenReply, onOpenReactions, onSendQuickReaction,
                 {e}
               </button>
             ))}
-            {/* "+" button — opens the full emoji picker sheet */}
             <button
               onClick={onOpenEmojiPicker}
               style={{
@@ -285,21 +419,73 @@ function MomentCard({ moment, onOpenReply, onOpenReactions, onSendQuickReaction,
 }
 
 export default function FeedScreen() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+
+  // ---- Stores ------------------------------------------------------------
+  const user = useAuthStore((s) => s.user);
+
+  const friends = useFriendStoreV2((s) => s.friends);
+  const loadFriends = useFriendStoreV2((s) => s.loadFriends);
+
+  const loadInitial = useMomentsStoreV2((s) => s.loadInitial);
+  const loadMoreOlder = useMomentsStoreV2((s) => s.loadMoreOlder);
+  const loading = useMomentsStoreV2((s) => s.loading);
+  const isLoadingMore = useMomentsStoreV2((s) => s.isLoadingMore);
+  const hasMore = useMomentsStoreV2((s) => s.hasMore);
+  const allMoments = useMomentsStoreV2(selectMomentsArray);
+
+  // ---- Local UI state ----------------------------------------------------
   const [audience, setAudience] = useState("all");
   const [reactionMoment, setReactionMoment] = useState(null);
   const [replyMoment, setReplyMoment] = useState(null);
   const [emojiPickerMoment, setEmojiPickerMoment] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [toast, setToast] = useState(null); // string shown briefly after sending
-  const [searchParams] = useSearchParams();
-  const dateFilter = searchParams.get("date"); // "YYYY-MM-DD" from /memories cell click
-  const moments = useMemo(() => filterMoments(audience, dateFilter), [audience, dateFilter]);
-  const navigate = useNavigate();
-  const location = useLocation();
-  // Slide-in from below on every visit (user always navigates here from another screen)
-  const enterClass = location.key === "default" ? "" : "animate-slide-from-bottom";
+  const [toast, setToast] = useState(null);
 
-  // Pull-back-to-camera gesture state — only active when scroll is at the top
+  // Date filter from /memories cell click — "YYYY-MM-DD" or null
+  const dateFilter = searchParams.get("date");
+
+  // ---- Derived data ------------------------------------------------------
+  const meUid = user?.uid || user?.localId || null;
+
+  // O(1) lookup for moment author info.
+  const friendsByUid = useMemo(() => {
+    const map = {};
+    for (const f of friends ?? []) {
+      if (f?.uid) map[f.uid] = f;
+    }
+    return map;
+  }, [friends]);
+
+  const moments = useMemo(
+    () => filterMoments(allMoments, audience, dateFilter, meUid),
+    [allMoments, audience, dateFilter, meUid],
+  );
+
+  // ---- Effects -----------------------------------------------------------
+  // 1) Initial moment fetch — once on mount when authed.
+  useEffect(() => {
+    if (!user) return;
+    loadInitial({ friendId: null });
+  }, [user, loadInitial]);
+
+  // 2) Friend list — only fetch if missing so we don't re-trigger on every
+  //    moment store mutation.
+  useEffect(() => {
+    if (!user) return;
+    if (!friends?.length) loadFriends?.();
+  }, [user, friends?.length, loadFriends]);
+
+  // 3) Toast auto-dismiss
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 1800);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  // ---- Pull-back-to-camera gesture --------------------------------------
   const scrollRef = useRef(null);
   const dragStartY = useRef(null);
   const wheelLockedUntil = useRef(0);
@@ -314,7 +500,6 @@ export default function FeedScreen() {
     if (dragStartY.current == null) return;
     const dy = e.clientY - dragStartY.current;
     dragStartY.current = null;
-    // Positive dy (finger dragged down) at top of feed → back to camera
     if (dy >= PULL_BACK_THRESHOLD && isAtTop()) navigate("/");
   }
   function handleScrollWheel(e) {
@@ -325,21 +510,50 @@ export default function FeedScreen() {
     }
   }
 
-  // Auto-dismiss toast after 1.8s
+  // ---- Infinite scroll sentinel ----------------------------------------
+  // We only paginate when audience === "all" + no date filter — narrower
+  // filters render a subset of already-fetched data; client-side filtering
+  // is plenty for typical feed sizes.
+  const sentinelRef = useRef(null);
+  const canPaginate = audience === "all" && !dateFilter;
   useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 1800);
-    return () => clearTimeout(t);
-  }, [toast]);
+    const node = sentinelRef.current;
+    if (!node) return;
+    if (!canPaginate) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && hasMore && !isLoadingMore && !loading) {
+          loadMoreOlder({ friendId: null });
+        }
+      },
+      { rootMargin: "400px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [canPaginate, hasMore, isLoadingMore, loading, loadMoreOlder, moments.length]);
 
   function sendReaction(emoji) {
+    // Phase 7 wires the real reaction API; for now keep the visual confirm.
     setToast(`Đã gửi ${emoji}`);
     setEmojiPickerMoment(null);
   }
 
+  // Slide-in from below on every visit (user always navigates here from another screen)
+  const enterClass = location.key === "default" ? "" : "animate-slide-from-bottom";
+
+  const showSkeleton = loading && moments.length === 0;
+  const showEmpty = !loading && moments.length === 0;
+
+  const authorAvatar =
+    user?.profilePicture || user?.profile_picture_url || user?.avatar || null;
+  const authorName = user?.displayName || user?.first_name || "Bạn";
+
   return (
-    <div className={enterClass} style={{ position: "absolute", inset: 0, background: "var(--bg-primary)", display: "flex", flexDirection: "column" }}>
-      {/* Top bar — pushed down for safe-area breathing room (see docs/design-patterns.md §1.1) */}
+    <div
+      className={enterClass}
+      style={{ position: "absolute", inset: 0, background: "var(--bg-primary)", display: "flex", flexDirection: "column" }}
+    >
+      {/* Top bar — pushed down for safe-area breathing room */}
       <div
         style={{
           flexShrink: 0,
@@ -360,12 +574,14 @@ export default function FeedScreen() {
           onClick={() => setProfileOpen(true)}
           style={{ background: "none", border: "none", padding: 0, cursor: "pointer", borderRadius: "50%" }}
         >
-          <Avatar src={currentUser.avatar} name={currentUser.name} size={36} />
+          <Avatar src={authorAvatar} name={authorName} size={36} />
         </button>
       </div>
 
-      {/* Vertical snap scroller — one moment per snap, swipe up/down to navigate.
-          When at the top, an upward wheel/drag-down navigates back to camera. */}
+      {/* Horizontal friend strip — tap to scope feed to a friend */}
+      <FriendMomentRow onSelectFriend={(uid) => setAudience(uid)} />
+
+      {/* Vertical snap scroller */}
       <div
         ref={scrollRef}
         onPointerDown={handleScrollPointerDown}
@@ -382,28 +598,113 @@ export default function FeedScreen() {
           WebkitOverflowScrolling: "touch",
         }}
       >
-        {moments.length === 0 ? (
+        {showSkeleton ? (
+          <div
+            style={{
+              padding: "60px 16px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 12,
+              color: "var(--text-secondary)",
+            }}
+          >
+            <div
+              style={{
+                width: "100%",
+                maxWidth: 360,
+                aspectRatio: "1 / 1",
+                background: "var(--bg-surface)",
+                borderRadius: "var(--radius-card)",
+                animation: "pulse 1.4s ease-in-out infinite",
+              }}
+            />
+            <span style={{ fontSize: 13 }}>Đang tải khoảnh khắc...</span>
+          </div>
+        ) : showEmpty ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-secondary)" }}>
             Chưa có khoảnh khắc nào
           </div>
         ) : (
-          moments.map((m) => (
-            <MomentCard
-              key={m.id}
-              moment={m}
-              onOpenReactions={setReactionMoment}
-              onOpenReply={() => setReplyMoment(m)}
-              onSendQuickReaction={sendReaction}
-              onOpenEmojiPicker={() => setEmojiPickerMoment(m)}
-            />
-          ))
+          moments.map((m) => {
+            const ownerUid = getMomentOwnerUid(m);
+            const author = resolveAuthor({
+              ownerUid,
+              friendsByUid,
+              meUid,
+              me: user,
+            });
+            return (
+              <MomentCard
+                key={m.id}
+                moment={m}
+                meUid={meUid}
+                author={author}
+                onOpenReactions={setReactionMoment}
+                onOpenReply={() => setReplyMoment(m)}
+                onSendQuickReaction={sendReaction}
+                onOpenEmojiPicker={() => setEmojiPickerMoment(m)}
+              />
+            );
+          })
+        )}
+
+        {/* Bottom sentinel — drives loadMoreOlder when in view */}
+        {moments.length > 0 && canPaginate && (
+          <div
+            ref={sentinelRef}
+            aria-hidden="true"
+            style={{ height: 1 }}
+          />
+        )}
+
+        {/* Pagination loading footer */}
+        {moments.length > 0 && canPaginate && isLoadingMore && (
+          <div
+            style={{
+              padding: "16px 0 24px",
+              textAlign: "center",
+              color: "var(--text-secondary)",
+              fontSize: 13,
+            }}
+          >
+            Đang tải thêm...
+          </div>
+        )}
+
+        {/* End-of-feed marker */}
+        {moments.length > 0 && canPaginate && !hasMore && !isLoadingMore && (
+          <div
+            style={{
+              padding: "16px 0 32px",
+              textAlign: "center",
+              color: "var(--text-secondary)",
+              fontSize: 13,
+            }}
+          >
+            Bạn đã xem hết
+          </div>
         )}
       </div>
 
       <BottomNav />
 
       {/* Reply overlay — friend's moment message bar opens this */}
-      <ReplyOverlay moment={replyMoment} onClose={() => setReplyMoment(null)} />
+      <ReplyOverlay
+        moment={replyMoment}
+        authorName={
+          replyMoment
+            ? resolveAuthor({
+                ownerUid: getMomentOwnerUid(replyMoment),
+                friendsByUid,
+                meUid,
+                me: user,
+              }).name
+            : ""
+        }
+        image={replyMoment ? getMomentImage(replyMoment) : null}
+        onClose={() => setReplyMoment(null)}
+      />
 
       {/* Profile sheet — opened from avatar (top-right) */}
       <ProfileSheet open={profileOpen} onClose={() => setProfileOpen(false)} />
@@ -481,10 +782,14 @@ export default function FeedScreen() {
                 key={i}
                 style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px" }}
               >
-                <Avatar src={r.user.avatar} name={r.user.name} size={40} />
+                <Avatar src={r.user?.avatar || r.user?.profilePic} name={r.user?.name || r.user?.firstName} size={40} />
                 <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-                  <span style={{ fontSize: 15, fontWeight: 600 }}>{r.user.name}</span>
-                  <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{r.time}</span>
+                  <span style={{ fontSize: 15, fontWeight: 600 }}>
+                    {r.user?.name || r.user?.firstName || "Người dùng"}
+                  </span>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                    {r.time || ""}
+                  </span>
                 </div>
                 <span style={{ fontSize: 24 }}>{r.emoji}</span>
               </div>
