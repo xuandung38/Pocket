@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "locket-dark",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "apps/locket-dark", "run", "dev"],
+      "port": 5174,
+      "autoPort": true
+    }
+  ]
+}

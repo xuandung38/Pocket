@@ -1,0 +1,256 @@
+@import "tailwindcss";
+
+/* Dark OLED design tokens — derived from Locket native app screenshots */
+:root {
+  --bg-primary: #0c0c0c;
+  --bg-surface: #1c1c1e;
+  --bg-elevated: #2c2c2e;
+  --bg-pill: rgba(44, 44, 46, 0.85);
+
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.55);
+  --text-tertiary: rgba(255, 255, 255, 0.3);
+
+  --accent-yellow: #f5a623;
+  --accent-yellow-dim: rgba(245, 166, 35, 0.15);
+
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-medium: rgba(255, 255, 255, 0.14);
+
+  --bubble-own-bg: #f5a623;
+  --bubble-own-text: #000000;
+  --bubble-other-bg: #2c2c2e;
+  --bubble-other-text: #ffffff;
+
+  --radius-card: 28px;
+  --radius-pill: 9999px;
+  --radius-bubble: 20px;
+
+  --nav-height: 72px;
+  --header-height: 52px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  background: #000;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI",
+    sans-serif;
+  color: var(--text-primary);
+  overscroll-behavior: none;
+}
+
+/* Phone frame wrapper for desktop view */
+.phone-frame {
+  width: 100%;
+  max-width: 430px;
+  height: 100dvh;
+  margin: 0 auto;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+/* Scrollable area inside phone */
+.scroll-area {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.scroll-area::-webkit-scrollbar {
+  display: none;
+}
+
+/* Bottom sheet backdrop — absolute so it clips to phone-frame, not viewport */
+.sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  z-index: 40;
+}
+
+/* Bottom sheet panel — anchored to bottom of its clipping wrapper */
+.sheet-panel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg-surface);
+  border-radius: 24px 24px 0 0;
+  z-index: 1;
+  padding-bottom: 24px;
+  max-height: 85%;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+/* Sheet drag handle */
+.sheet-handle {
+  width: 36px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 2px;
+  margin: 10px auto 0;
+}
+
+/* Pill button style */
+.pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-pill);
+  backdrop-filter: blur(10px);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  user-select: none;
+  transition: opacity 0.15s;
+  border: none;
+  outline: none;
+}
+.pill-btn:active {
+  opacity: 0.7;
+}
+
+/* Icon button circle */
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--bg-pill);
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  transition: opacity 0.15s;
+}
+.icon-btn:active {
+  opacity: 0.7;
+}
+
+/* Caption sticker chip */
+.caption-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-elevated);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+  user-select: none;
+}
+.caption-chip:active {
+  opacity: 0.7;
+}
+
+/* Active tab dot indicator */
+.tab-active-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent-yellow);
+  margin: 2px auto 0;
+}
+
+/* Smooth slide-up animation */
+@keyframes slide-up {
+  from { transform: translate3d(0, 100%, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+.animate-slide-up {
+  animation: slide-up 0.32s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  will-change: transform;
+}
+
+/* Slide-down (exit) — symmetric mirror of slide-up */
+@keyframes slide-down {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(0, 100%, 0); }
+}
+.animate-slide-down {
+  animation: slide-down 0.32s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  will-change: transform;
+}
+
+/* Page-transition: enter from above (used when camera re-mounts after feed) */
+@keyframes slide-from-top {
+  from { transform: translate3d(0, -100%, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+.animate-slide-from-top {
+  animation: slide-from-top 0.32s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  will-change: transform;
+}
+
+/* Page-transition: enter from below (used when feed mounts from camera) */
+@keyframes slide-from-bottom {
+  from { transform: translate3d(0, 100%, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+.animate-slide-from-bottom {
+  animation: slide-from-bottom 0.32s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  will-change: transform;
+}
+
+/* Fade-in */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade-in {
+  animation: fade-in 0.2s ease forwards;
+}
+
+/* Fade-out (exit) — slightly slower than panel slide so backdrop lingers smoothly */
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+.animate-fade-out {
+  animation: fade-out 0.32s ease forwards;
+  will-change: opacity;
+}
+
+/* Dropdown in/out — scale + fade from top-center origin */
+@keyframes dropdown-in {
+  from { opacity: 0; transform: translateX(-50%) scale(0.92); }
+  to   { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+@keyframes dropdown-out {
+  from { opacity: 1; transform: translateX(-50%) scale(1); }
+  to   { opacity: 0; transform: translateX(-50%) scale(0.92); }
+}
+.animate-dropdown-in {
+  animation: dropdown-in 0.2s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  will-change: transform, opacity;
+}
+.animate-dropdown-out {
+  animation: dropdown-out 0.2s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  will-change: transform, opacity;
+}
+
+/* Scale tap feedback */
+button:active, a:active {
+  transform: scale(0.97);
+}
