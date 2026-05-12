@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 
 import { useAuthStore } from "@/stores";
 import { AppProvider } from "@/context/AppContext";
+import OptionMoment from "@/components/option-moment";
 
 const CameraScreen = lazy(() => import("./screens/camera-screen"));
 const FeedScreen = lazy(() => import("./screens/feed-screen"));
@@ -92,6 +93,9 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
+        {/* Global overlay — controlled by AppContext modals.optionMoment.
+            Mounted once so any screen can trigger the sheet without remount. */}
+        <OptionMoment />
       </div>
     </AppProvider>
   );

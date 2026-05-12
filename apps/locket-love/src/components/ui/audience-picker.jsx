@@ -1,25 +1,42 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { friends, currentUser } from "../../data/mock-data";
+import { useAuthStore, useFriendStoreV2 } from "@/stores";
 import Avatar from "./avatar";
-
-// "Bạn" = the current account owner's own feed (not a friend group)
-const options = [
-  { id: "all", label: "Mọi người", icon: null },
-  { id: "owner", label: "Bạn", avatar: currentUser.avatar },
-  ...friends.map((f) => ({ id: f.id, label: f.name, avatar: f.avatar })),
-];
 
 // Match the BottomSheet exit timing so animations feel consistent.
 // See docs/design-patterns.md §2.3 for the mount-then-exit pattern.
 const EXIT_DURATION = 220;
 
-// Dropdown audience picker — matches IMG_7931 top-center dropdown
+// Dropdown audience picker — matches IMG_7931 top-center dropdown.
+// "Bạn" = the current account owner's own feed (not a friend group).
+// Reads `user` from auth store + `friends` from friend store so the dropdown
+// always reflects the real graph (no more mock-data import).
 export default function AudiencePicker({ value, onChange }) {
   const [open, setOpen] = useState(false);
   // mounted/closing implement symmetric in/out animation
   const [mounted, setMounted] = useState(false);
   const [closing, setClosing] = useState(false);
+
+  const user = useAuthStore((s) => s.user);
+  const friends = useFriendStoreV2((s) => s.friends);
+
+  // Build option list reactively so newly accepted friends appear without remount.
+  // Keys: backend uses `uid` (preferred), fall back to `id` for legacy shapes.
+  const options = useMemo(() => {
+    const ownerAvatar =
+      user?.photoUrl || user?.photoURL || user?.avatar || null;
+    const friendOpts = (friends ?? []).map((f) => ({
+      id: f.uid ?? f.id,
+      label: f.displayName || f.name || f.username || "Bạn bè",
+      avatar: f.photoUrl || f.photoURL || f.avatar || null,
+    }));
+    return [
+      { id: "all", label: "Mọi người", icon: null },
+      { id: "owner", label: "Bạn", avatar: ownerAvatar },
+      ...friendOpts,
+    ];
+  }, [user, friends]);
+
   const selected = options.find((o) => o.id === value) || options[0];
 
   useEffect(() => {

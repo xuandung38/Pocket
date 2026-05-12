@@ -1,104 +1,64 @@
-// Mock data for Locket Dark demo — no real API calls
-
-export const currentUser = {
-  id: "me",
-  name: "Dio",
-  username: "@diodio",
-  avatar: "https://api.dicebear.com/9.x/avataaars/svg?seed=Dio&backgroundColor=b6e3f4",
-};
+// Static UI assets + remaining demo seed data for Locket Love.
+//
+// History: this file was the original mock backend for the design prototype.
+// Phases 2–7 wired real services + stores, so the user/friends/chat/feed
+// fixtures here have been removed. Demo seeds that still drive screens with
+// no API counterpart (memories calendar, photo strips, caption stickers,
+// music service list) remain until those screens migrate fully.
+//
+// Phase 8 cleanup removed (orphans with no remaining consumer):
+//   - searchableUsers                → request-services.findFriendByUserName
+//   - conversations, chatMessages    → chat store / chat-services
+//
+// Still exported as stubs because callers haven't migrated yet — drop them
+// when the consumer screen switches to the live store:
+//   - currentUser → useAuthStore       (consumer: memories-screen)
+//   - friends     → useFriendStoreV2   (consumer: send-screen recipient grid)
+//
+// FRIENDS_LIMIT is a real product constant (Locket allows up to 20 friends);
+// kept here as a single source of truth for the friends-sheet UI.
 
 // Maximum allowed friends — shown in the friends sheet header (e.g., "2 / 20 người bạn")
 export const FRIENDS_LIMIT = 20;
 
-// Mock directory for "Thêm theo tên người dùng" search results
-export const searchableUsers = [
-  { id: "u1", name: "Hien Nguyen", username: "hien", avatar: "https://api.dicebear.com/9.x/avataaars/svg?seed=Hien&backgroundColor=ffd5dc" },
-  { id: "u2", name: "Minh Anh", username: "minhanh", avatar: "https://api.dicebear.com/9.x/avataaars/svg?seed=MinhAnh&backgroundColor=d1d4f9" },
-  { id: "u3", name: "Tuấn Kiệt", username: "tuankiet", avatar: "https://api.dicebear.com/9.x/avataaars/svg?seed=TuanKiet&backgroundColor=c0aede" },
-  { id: "u4", name: "Linh Đan", username: "linhdan", avatar: "https://api.dicebear.com/9.x/avataaars/svg?seed=LinhDan&backgroundColor=ffdfbf" },
-];
+// Stub owner used by memories-screen for the header avatar. Memories has no
+// per-account API counterpart yet; once it does, this export can be removed.
+export const currentUser = {
+  id: "me",
+  name: "Bạn",
+  username: "",
+  avatar: null,
+};
 
+// Internal alias used by the feedMoments seed below.
+const fallbackOwner = currentUser;
+
+// Stub friend list — still exported for send-screen (recipient picker grid)
+// which has not yet migrated to useFriendStoreV2. Once it does, drop the
+// `friends` export. The default `[]` would break the demo recipient grid
+// when no real friends are loaded, so we keep two placeholder entries.
 export const friends = [
   {
     id: "f1",
-    name: "Ngọc Ánh Nguyễn Thị",
-    username: "@ngocanhnt",
-    avatar: "https://api.dicebear.com/9.x/avataaars/svg?seed=NgocanH&backgroundColor=ffdfbf",
+    name: "Bạn 1",
+    username: "@friend1",
+    avatar: null,
   },
   {
     id: "f2",
-    name: "trẻ người nonstop",
-    username: "@trenguoi",
-    avatar: "https://api.dicebear.com/9.x/avataaars/svg?seed=TreNguoi&backgroundColor=c0aede",
+    name: "Bạn 2",
+    username: "@friend2",
+    avatar: null,
   },
 ];
 
-export const conversations = [
-  {
-    id: "c1",
-    friend: friends[0],
-    lastMessage: "Chốt nhé, nhưng chắc chờ con thi x...",
-    lastTime: "10g",
-    unread: 0,
-  },
-  {
-    id: "c2",
-    friend: friends[1],
-    lastMessage: "hic",
-    lastTime: "2ngày",
-    unread: 0,
-  },
-];
-
-export const chatMessages = [
-  {
-    id: "m1",
-    senderId: "f1",
-    text: "Chú đẹp anh kia cũng đẹp 😅",
-    time: "Hôm qua 5:34 CH",
-    isFirst: true,
-  },
-  {
-    id: "m2",
-    senderId: "me",
-    text: "thích ko, chú giới thiệu kk",
-    time: null,
-  },
-  {
-    id: "m3",
-    senderId: "me",
-    text: "Nay ko đi đâu chơi à châu",
-    time: null,
-  },
-  {
-    id: "m4",
-    senderId: "f1",
-    text: null,
-    time: "Hôm qua 10:42 CH",
-    image: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&q=80",
-    caption: "Thượng hạng",
-    rating: 5,
-    isFirst: true,
-  },
-  {
-    id: "m5",
-    senderId: "me",
-    text: "Nào qua nhà chú chơi trò tài xem nào",
-    time: null,
-  },
-  {
-    id: "m6",
-    senderId: "f1",
-    text: "Chốt nhé, nhưng chắc chờ con thi xong, giờ con đang vùi đầu vào 2 bài tiểu luận 😭",
-    time: "Hôm nay 12:04 SA",
-    isFirst: true,
-  },
-];
+// Internal alias preserved for the feedMoments demo seed.
+const fallbackFriends = friends;
 
 export const feedMoments = [
   {
     id: "p0",
-    author: currentUser,
+    author: fallbackOwner,
     image: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=80",
     caption: "góc nhỏ",
     timeAgo: "2g",
@@ -106,14 +66,14 @@ export const feedMoments = [
     reactions: ["🔥", "😍", "❤️"],
     // reactions received on this moment (only on own posts)
     reactionList: [
-      { user: friends[0], emoji: "🔥", time: "1g" },
-      { user: friends[1], emoji: "😍", time: "1g" },
-      { user: friends[0], emoji: "❤️", time: "30p" },
+      { user: fallbackFriends[0], emoji: "🔥", time: "1g" },
+      { user: fallbackFriends[1], emoji: "😍", time: "1g" },
+      { user: fallbackFriends[0], emoji: "❤️", time: "30p" },
     ],
   },
   {
     id: "p1",
-    author: friends[1],
+    author: fallbackFriends[1],
     image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&q=80",
     caption: "sos",
     timeAgo: "1ngày",
@@ -122,7 +82,7 @@ export const feedMoments = [
   },
   {
     id: "p2",
-    author: friends[0],
+    author: fallbackFriends[0],
     image: "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=600&q=80",
     caption: "My FML",
     timeAgo: "14g",

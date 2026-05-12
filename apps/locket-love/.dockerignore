@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.cache/
+.vite/
+*.local
+.env.local
+.env.*.local
+.env.production
+.git/
+.DS_Store
