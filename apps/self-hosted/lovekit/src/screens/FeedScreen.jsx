@@ -1,16 +1,13 @@
 import clsx from "clsx";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Sparkles } from "lucide-react";
 import EmptyState from "@/components/ui/EmptyState";
 import LoadingSkeleton from "@/components/ui/LoadingSkeleton";
 import FriendAvatar from "@/components/FriendAvatar";
 import MomentSlideActions from "@/components/MomentSlideActions";
 import { formatTimeAgo } from "@/utils";
-import {
-  useAuthStore,
-  useFriendStore,
-  useMomentsStoreV2,
-} from "@/stores";
+import { useAuthStore, useMomentsStoreV2 } from "@/stores";
+import { useFriendStoreV2 } from "@/stores/friendStore";
 
 const TOUCH_PULL_THRESHOLD = 60;
 
@@ -123,8 +120,9 @@ export default function FeedScreen({ className, onBack }) {
   const loadMoreOlder = useMomentsStoreV2((s) => s.loadMoreOlder);
   const bucket = useMomentsStoreV2((s) => s.momentsByUser?.all);
 
-  const friends = useFriendStore((s) => s.friendDetails);
-  const loadFriends = useFriendStore((s) => s.loadFriends);
+  const friends = useFriendStoreV2((s) => s.friendList);
+  const loadFriends = useFriendStoreV2((s) => s.loadFriends);
+  const friendMap = useFriendStoreV2((s) => s.friendDetailsMap);
 
   const containerRef = useRef(null);
   const sentinelRef = useRef(null);
@@ -134,14 +132,6 @@ export default function FeedScreen({ className, onBack }) {
   const loading = bucket?.loading ?? false;
   const hasMore = bucket?.hasMore ?? true;
   const isLoadingMore = bucket?.isLoadingMore ?? false;
-
-  const friendMap = useMemo(() => {
-    const map = {};
-    for (const f of friends ?? []) {
-      if (f?.uid) map[f.uid] = f;
-    }
-    return map;
-  }, [friends]);
 
   const meUid = user?.uid || user?.localId || null;
 

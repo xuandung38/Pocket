@@ -8,7 +8,7 @@ import StreakCalendar from "@/components/StreakCalendar";
 import FriendListItem from "@/components/FriendListItem";
 import SettingsSheet from "@/components/SettingsSheet";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { useFriendStore } from "@/stores/useFriendStore";
+import { useFriendStoreV2 } from "@/stores/friendStore";
 import { useStreakStore } from "@/stores/useStreakStore";
 import { useApp } from "@/context/AppContext";
 
@@ -21,9 +21,9 @@ export default function ProfileScreen({ className, onLogout }) {
   const hydrate = useAuthStore((s) => s.hydrate);
   const initAuth = useAuthStore((s) => s.init);
 
-  const friends = useFriendStore((s) => s.friendDetails);
-  const friendsLoading = useFriendStore((s) => s.loading);
-  const loadFriends = useFriendStore((s) => s.loadFriends);
+  const friends = useFriendStoreV2((s) => s.friendList);
+  const friendsLoading = useFriendStoreV2((s) => s.loading);
+  const loadFriends = useFriendStoreV2((s) => s.loadFriends);
 
   const streak = useStreakStore((s) => s.streak);
   const initStreak = useStreakStore((s) => s.initStreak);
