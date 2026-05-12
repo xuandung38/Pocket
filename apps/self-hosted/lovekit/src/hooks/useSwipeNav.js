@@ -25,17 +25,19 @@ export function useSwipeNav(navState, setNavState) {
 
       if (navState === "camera") {
         if (!isHoriz && dy < -THRESHOLD) setNavState("feed");
-        else if (isHoriz && dx < -THRESHOLD) setNavState("messages");
-        else if (isHoriz && dx > THRESHOLD) setNavState("profile");
+        // Messages is positioned left (translateX(-100%)) → reveal by swiping RIGHT
+        else if (isHoriz && dx > THRESHOLD) setNavState("messages");
+        // Profile is positioned right (translateX(+100%)) → reveal by swiping LEFT
+        else if (isHoriz && dx < -THRESHOLD) setNavState("profile");
       } else if (navState === "feed") {
         // Only swipe DOWN from feed → camera; swipe-up is internal scroll-snap nav
         if (!isHoriz && dy > THRESHOLD) setNavState("camera");
       } else if (navState === "messages") {
-        // Only swipe RIGHT from messages → camera (messages slides in from left)
-        if (isHoriz && dx > THRESHOLD) setNavState("camera");
-      } else if (navState === "profile") {
-        // Only swipe LEFT from profile → camera (profile slides in from right)
+        // Swipe LEFT to go back (reverse of swipe-right entry)
         if (isHoriz && dx < -THRESHOLD) setNavState("camera");
+      } else if (navState === "profile") {
+        // Swipe RIGHT to go back (reverse of swipe-left entry)
+        if (isHoriz && dx > THRESHOLD) setNavState("camera");
       }
     },
     [navState, setNavState],

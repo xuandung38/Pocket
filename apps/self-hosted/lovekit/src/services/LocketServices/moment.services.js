@@ -1,6 +1,5 @@
 import { getMomentById } from "@/cache/momentDB";
 import api from "@/lib/axios";
-import { instanceLocketV2 } from "@/lib/axios.locket";
 import { getToken } from "@/utils";
 import { generateUUIDv4Upper } from "@/utils/generate/uuid";
 
@@ -16,7 +15,7 @@ export const SendReactMoment = async (emoji, selectedMomentId, power) => {
         owner_uid: localId,
       },
     };
-    const response = await instanceLocketV2.post("reactToMoment", body);
+    const response = await api.post("/locket/proxy/reactToMoment", body);
 
     return response.data;
   } catch (err) {
@@ -31,11 +30,11 @@ export const GetViewsMoment = async (idMoment) => {
         moment_uid: idMoment
       }
     }
-    const res = await instanceLocketV2.post("getMomentViews", body);
+    const res = await api.post("/locket/proxy/getMomentViews", body);
     const moments = res.data.result?.data;
     return moments;
   } catch (err) {
-    console.warn("❌ React Failed", err);
+    console.warn("❌ GetViewsMoment Failed", err);
   }
 };
 
@@ -49,11 +48,11 @@ export const GetLastestMoment = async () => {
       },
     };
 
-    const res = await instanceLocketV2.post("getLatestMomentV2", body); // 👈 thêm body
+    const res = await api.post("/locket/proxy/getLatestMomentV2", body);
     const moments = res.data.result;
     return moments;
   } catch (err) {
-    console.warn("❌ React Failed", err);
+    console.warn("❌ GetLastestMoment Failed", err);
   }
 };
 
@@ -65,11 +64,11 @@ export const getMomentViews = async (momentId) => {
       },
     };
 
-    const res = await instanceLocketV2.post("getMomentViews", body); // 👈 thêm body
+    const res = await api.post("/locket/proxy/getMomentViews", body);
     const moments = res.data.result;
     return moments;
   } catch (err) {
-    console.warn("❌ markMomentAsViewed Failed", err);
+    console.warn("❌ getMomentViews Failed", err);
   }
 };
 
@@ -77,7 +76,7 @@ export const SendMessageMoment = async (message, selectedMomentId, uid) => {
   try {
     const body = {
       data: {
-        msg: message || " ", // Nội dung tin nhắn
+        msg: message || " ",
         analytics: {
           amplitude: {
             device_id: generateUUIDv4Upper(),
@@ -96,7 +95,7 @@ export const SendMessageMoment = async (message, selectedMomentId, uid) => {
       },
     };
 
-    const response = await instanceLocketV2.post("sendChatMessageV2", body);
+    const response = await api.post("/locket/proxy/sendChatMessageV2", body);
 
     return response.data;
   } catch (err) {
@@ -115,24 +114,23 @@ export const DeleteMoment = async (selectedMomentId) => {
       return null;
     }
 
-    //Xác định có xoá toàn cục không?
     const deleteGlobally = infoMoment.user === localId;
 
     const body = {
       data: {
         moment_uid: selectedMomentId,
         owner_uid: infoMoment.user,
-        delete_globally: deleteGlobally, // true nếu là chủ sở hữu
+        delete_globally: deleteGlobally,
       },
     };
 
-    const res = await instanceLocketV2.post("deleteMomentV2", body);
+    const res = await api.post("/locket/proxy/deleteMomentV2", body);
 
     const deletedIds = res?.data?.result?.data;
     const deletedId = Array.isArray(deletedIds) ? deletedIds[0] : null;
-    return deletedId; // 👉 trả về ID đã xoá
+    return deletedId;
   } catch (err) {
-    console.warn("❌ Failed", err);
+    console.warn("❌ DeleteMoment Failed", err);
     return null;
   }
 };
@@ -145,10 +143,10 @@ export const markAsViewedMoment = async (selectedMomentId) => {
         notify: false,
       },
     };
-    const res = await instanceLocketV2.post("markMomentAsViewed", body);
+    const res = await api.post("/locket/proxy/markMomentAsViewed", body);
     const moments = res.data;
     return moments;
   } catch (err) {
-    console.warn("❌ Failed", err);
+    console.warn("❌ markAsViewedMoment Failed", err);
   }
 };

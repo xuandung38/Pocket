@@ -43,15 +43,14 @@ export default function FriendMomentRow({ className }) {
   return (
     <>
       <div
-        className={clsx(
-          "flex gap-3 px-4 py-2 overflow-x-auto",
-          "[&::-webkit-scrollbar]:hidden",
-          className,
-        )}
+        className={clsx("overflow-x-auto [&::-webkit-scrollbar]:hidden py-2", className)}
         style={{ scrollbarWidth: "none", touchAction: "pan-x" }}
-        role="list"
-        aria-label="Friend moments"
       >
+        <div
+          className="flex gap-3 px-4"
+          role="list"
+          aria-label="Friend moments"
+        >
         {(friendList || []).map((friend) => {
           const hasNewMoment = Boolean(friendMomentMap[friend.uid]);
           const fullName =
@@ -80,6 +79,7 @@ export default function FriendMomentRow({ className }) {
             </button>
           );
         })}
+        </div>
       </div>
 
       {viewer && (

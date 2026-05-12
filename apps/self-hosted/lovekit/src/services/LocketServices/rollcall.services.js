@@ -1,4 +1,4 @@
-import { instanceLocketV2 } from "@/lib/axios.locket";
+import api from "@/lib/axios";
 import { getISOWeek } from "@/utils";
 
 export const getRollcallPosts = async ({ selectWeek, selectYear }) => {
@@ -17,11 +17,11 @@ export const getRollcallPosts = async ({ selectWeek, selectYear }) => {
         },
       },
     };
-    const res = await instanceLocketV2.post("getRollcallPosts", body);
+    const res = await api.post("/locket/proxy/getRollcallPosts", body);
     const moments = res.data?.result?.data?.posts;
     return moments;
   } catch (err) {
-    console.warn("❌ Failed", err);
+    console.warn("❌ getRollcallPosts Failed", err);
   }
 };
 
@@ -38,18 +38,13 @@ export const postRollcallReaction = async ({}) => {
         scale: 1,
       },
     };
-    const res = await instanceLocketV2.post("postRollcallReaction", body);
+    const res = await api.post("/locket/proxy/postRollcallReaction", body);
     const moments = res.data?.result?.data?.posts;
     return moments;
   } catch (err) {
-    console.warn("❌ Failed", err);
+    console.warn("❌ postRollcallReaction Failed", err);
   }
 };
-
-// {
-//   "result": {
-//     "status": 200
-// }
 
 export const likeRollcallComment = async ({}) => {
   try {
@@ -61,47 +56,29 @@ export const likeRollcallComment = async ({}) => {
         like: true,
       },
     };
-    const res = await instanceLocketV2.post("likeRollcallComment", body);
+    const res = await api.post("/locket/proxy/likeRollcallComment", body);
     const moments = res.data?.result;
     return moments;
   } catch (err) {
-    console.warn("❌ Failed", err);
+    console.warn("❌ likeRollcallComment Failed", err);
   }
 };
 
-// {
-//   "result": {
-//     "status": 200,
-//     "data": {
-//       "comment": {
-//         "body": "Ghê",
-//         "created_at": {
-//           "_seconds": 1765688999,
-//           "_nanoseconds": 164000000
-//         },
-//         "user": "RCQ94Icmh7fvFr5ycLaHJgyQo8j1",
-//         "post_item_uid": "XWqy6VIigU0udv7cJP7V",
-//         "uid": "STgwjqm0Kq4bzPHQ4x25",
-//         "likes": []
-//       }
-//     }
-//   }
-// }
 export const postRollcallComment = async ({}) => {
   try {
     const body = {
       data: {
-        reply_user_uid: "uid", // neeus reply thi them
+        reply_user_uid: "uid",
         post_user_uid: "NzGrCyCyOjcVPpGvlLcaiIiujaA3",
         post_uid: "bSIcLYRunxenfxptYFeQ",
         post_item_id: "STgwjqm0Kq4bzPHQ4x25",
         body: "string",
       },
     };
-    const res = await instanceLocketV2.post("postRollcallComment", body);
+    const res = await api.post("/locket/proxy/postRollcallComment", body);
     const moments = res.data?.result;
     return moments;
   } catch (err) {
-    console.warn("❌ Failed", err);
+    console.warn("❌ postRollcallComment Failed", err);
   }
 };

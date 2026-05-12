@@ -35,19 +35,13 @@ const FriendsSheet = () => {
   const { isFriendsTabOpen, setFriendsTabOpen, isPWA } = navigation;
   const [showAllFriends, setShowAllFriends] = useState(false);
 
-  // Lock body scroll while sheet open
+  // Lock body scroll while sheet is mounted (always open when this renders)
   useEffect(() => {
-    if (isFriendsTabOpen) {
-      document.body.classList.add("overflow-hidden");
-    } else {
-      document.body.classList.remove("overflow-hidden");
-      setShowAllFriends(false);
-    }
+    document.body.classList.add("overflow-hidden");
     return () => {
       document.body.classList.remove("overflow-hidden");
-      setShowAllFriends(false);
     };
-  }, [isFriendsTabOpen]);
+  }, []);
 
   const handleAcceptRequest = async (uid) => {
     try {
@@ -70,13 +64,13 @@ const FriendsSheet = () => {
     }
   };
 
+  if (!isFriendsTabOpen) return null;
+
   return (
     <>
       {/* Overlay */}
       <div
-        className={`absolute inset-0 bg-base-100/10 backdrop-blur-[2px] bg-opacity-50 transition-opacity duration-500 z-0 ${
-          isFriendsTabOpen ? "opacity-100 scale-100" : "opacity-0 scale-0"
-        }`}
+        className="fixed inset-0 bg-base-100/10 backdrop-blur-[2px] bg-opacity-50 z-40"
         onClick={() => {
           setFriendsTabOpen(false);
           setShowAllFriends(false);
@@ -84,18 +78,13 @@ const FriendsSheet = () => {
       />
 
       {/* Popup */}
-      <div
-        className={`fixed inset-0 z-50 flex justify-center items-end transition-all duration-800 ease text-base-content ${
-          isFriendsTabOpen
-            ? "translate-y-0"
-            : "translate-y-full pointer-events-none"
-        }`}
-      >
+      <div className="fixed inset-0 z-50 flex justify-center items-end text-base-content">
         <div
           ref={popupRef}
-          className={`relative w-full ${isPWA ? "h-[95vh]" : "h-[85vh]"}
+          className={`relative w-full ${isPWA ? "h-[95dvh]" : "h-[85dvh]"}
             bg-base-100 flex flex-col rounded-t-4xl shadow-lg
-            will-change-transform outline-2 outline-base-content outline-dashed z-50`}
+            will-change-transform z-50`}
+          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         >
           {/* Header */}
           <div className="sticky top-0 shadow-md z-10 flex flex-col items-center pb-2 px-3 bg-base-100 rounded-t-4xl">

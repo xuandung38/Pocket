@@ -1,6 +1,6 @@
 import { CONFIG } from "@/config";
 import { instanceExten } from "@/lib/axios.exten";
-import { instanceLocketV2 } from "@/lib/axios.locket";
+import api from "@/lib/axios";
 
 export const fetchUserById = async (uid) => {
   if (!uid) return;
@@ -10,7 +10,7 @@ export const fetchUserById = async (uid) => {
       user_uid: uid,
     },
   };
-  const res = await instanceLocketV2.post("fetchUserV2", body);
+  const res = await api.post("/locket/proxy/fetchUserV2", body);
 
   return res?.data?.result?.data;
 };

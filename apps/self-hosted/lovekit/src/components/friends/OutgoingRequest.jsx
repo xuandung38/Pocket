@@ -102,11 +102,9 @@ const OutgoingRequest = () => {
 
       {loading && friends.length === 0 ? (
         <p className="text-center text-base-content/50 h-[70px]">Đang tải...</p>
-      ) : errorMessage ? (
-        <p className="text-center text-red-500 h-[70px]">{errorMessage}</p>
       ) : friends.length === 0 ? (
         <p className="text-center text-base-content/50 h-[70px]">
-          Không tìm thấy ai!!
+          Chưa có yêu cầu nào đã gửi
         </p>
       ) : (
         <>

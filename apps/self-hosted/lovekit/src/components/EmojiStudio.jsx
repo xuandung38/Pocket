@@ -225,6 +225,8 @@ const EmojiStudio = () => {
     clearTimeout(holdTimeout.current);
   };
 
+  if (!showEmojiPicker) return null;
+
   const filteredEmojis = allEmojis.filter((e) => e.includes(searchTerm));
 
   const renderEmojiGroup = (title, emojis) => (

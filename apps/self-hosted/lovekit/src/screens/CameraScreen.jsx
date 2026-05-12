@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { Loader2, RotateCcw, Send, Settings, Image as ImageIcon, Users, X } from "lucide-react";
+import { Loader2, MessageCircle, RotateCcw, Send, Settings, Image as ImageIcon, Users, X } from "lucide-react";
 import CameraPreview from "@/components/CameraPreview";
 import CaptureButton from "@/components/CaptureButton";
 import CaptionInput from "@/components/CaptionInput";
@@ -20,7 +20,7 @@ import {
 
 const SWIPE_HINT_KEY = "lk:swipe-hint-seen";
 
-export default function CameraScreen({ className, isActive = true }) {
+export default function CameraScreen({ className, isActive = true, onNavigate }) {
   const previewRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -173,15 +173,33 @@ export default function CameraScreen({ className, isActive = true }) {
       )}
     >
       <header className="flex items-center justify-between px-4 pt-2 pb-2">
-        <FriendAvatar src={meAvatar} name={meName} size="md" />
-        <h1 className="font-semibold text-lg">Lovekit</h1>
         <button
           type="button"
-          aria-label="Settings"
-          className="size-10 rounded-full bg-base-200 flex items-center justify-center"
+          onClick={() => onNavigate?.("profile")}
+          aria-label="Hồ sơ"
+          className="rounded-full active:scale-95 transition-transform"
         >
-          <Settings className="size-5" />
+          <FriendAvatar src={meAvatar} name={meName} size="md" />
         </button>
+        <h1 className="font-semibold text-lg">Lovekit</h1>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onNavigate?.("messages")}
+            aria-label="Tin nhắn"
+            className="size-10 rounded-full bg-base-200 flex items-center justify-center active:scale-95 transition-transform"
+          >
+            <MessageCircle className="size-5" />
+          </button>
+          <button
+            type="button"
+            aria-label="Settings"
+            onClick={() => onNavigate?.("profile")}
+            className="size-10 rounded-full bg-base-200 flex items-center justify-center active:scale-95 transition-transform"
+          >
+            <Settings className="size-5" />
+          </button>
+        </div>
       </header>
 
       <div className="px-4 flex justify-center">
@@ -314,9 +332,9 @@ export default function CameraScreen({ className, isActive = true }) {
       <FriendMomentRow />
 
       {showSwipeHint && phase === "preview" && (
-        <p className="text-center text-xs text-base-content/50 pb-3 animate-pulse">
-          ↑ vuốt lên để xem feed
-        </p>
+        <div className="flex justify-center pb-3 text-xs text-base-content/50 animate-pulse select-none">
+          <span>↑ Vuốt lên để xem Feed</span>
+        </div>
       )}
 
       <input

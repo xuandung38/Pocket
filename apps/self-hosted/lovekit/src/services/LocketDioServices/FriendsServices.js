@@ -1,9 +1,6 @@
-import axios from "axios";
 import * as utils from "@/utils";
 import api from "@/lib/axios";
-import { instanceLocketV2 } from "@/lib/axios.locket";
 import { SonnerWarning } from "@/components/ui/SonnerToast";
-import { instanceMain } from "@/lib/axios.main";
 
 //lấy toàn bộ danh sách bạn bè (uid, createdAt) từ API
 // {
@@ -66,33 +63,18 @@ export const loadFriendDetailsV3 = async (friends) => {
 
 //fetch dữ liệu chi tiết về user qua uid
 export const fetchUser = async (user_uid) => {
-  // Đợi lấy token & uid
-  const { idToken } = utils.getToken() || {};
-
-  return await axios.post(
-    "https://api.locketcamera.com/fetchUserV2",
-    {
-      data: {
-        user_uid,
-      },
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${idToken}`,
-        "Content-Type": "application/json",
-      },
-    },
-  );
+  return await api.post("/locket/proxy/fetchUserV2", {
+    data: { user_uid },
+  });
 };
 
 export const fetchUserV2 = async (user_uid) => {
-  // Đợi lấy token & uid
   const body = {
     data: {
       user_uid: user_uid,
     },
   };
-  const res = await instanceLocketV2.post("fetchUserV2", body);
+  const res = await api.post("/locket/proxy/fetchUserV2", body);
   return res?.data?.result?.data;
 };
 //Tích hợp 2 hàm getListfirend và fetchuser cho thuận tiện việc lấy dữ liệu
@@ -167,7 +149,7 @@ export const FindFriendByUserName = async (eqfriend) => {
     const body = {
       username: eqfriend,
     };
-    const response = await instanceMain.post("https://api-beta.locket-dio.com/locket/getUserByData", body);
+    const response = await api.post("/locket/getUserByData", body);
 
     return response.data;
   } catch (error) {

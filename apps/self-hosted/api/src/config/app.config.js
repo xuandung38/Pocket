@@ -16,6 +16,8 @@ const serverConfig = {
 
   function: {
     locketApi: process.env.LOCKET_API_BASE,
+    betaApi: process.env.BETA_API_BASE || "https://api-beta.locket-dio.com",
+    betaApiKey: process.env.BETA_API_KEY || "",
   },
 
   security: {

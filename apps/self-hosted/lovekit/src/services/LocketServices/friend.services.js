@@ -1,4 +1,4 @@
-import { instanceLocketV2 } from "@/lib/axios.locket";
+import api from "@/lib/axios";
 import { normalizeFriendDataV2 } from "@/utils";
 import { chunkArray } from "@/helpers/chunkArray";
 import { fetchUserById } from "./fetch.services";
@@ -17,9 +17,9 @@ export const rejectMultipleFriendRequests = async (
     for (const batch of batches) {
       const promises = batch.map((uid) => {
         const body = { data: { user_uid: uid, direction } };
-        return instanceLocketV2
-          .post("deleteFriendRequest", body)
-          .then(() => uid); // nếu thành công thì trả lại uid
+        return api
+          .post("/locket/proxy/deleteFriendRequest", body)
+          .then(() => uid);
       });
 
       const responses = await Promise.allSettled(promises);
@@ -31,7 +31,6 @@ export const rejectMultipleFriendRequests = async (
         }
       });
 
-      // tránh spam server
       await new Promise((r) => setTimeout(r, 500));
     }
 
@@ -51,9 +50,9 @@ export const rejectFriendRequests = async (uid, direction = "outgoing") => {
       },
     };
 
-    const response = await instanceLocketV2.post("deleteFriendRequest", body);
+    const response = await api.post("/locket/proxy/deleteFriendRequest", body);
 
-    return response; // giả sử response trả về dữ liệu thành công
+    return response;
   } catch (error) {
     console.error("Lỗi khi xoá lời mời:", error.message);
     return [];
@@ -64,22 +63,19 @@ export const AcceptRequestToFriend = async (uid) => {
   try {
     const body = { data: { user_uid: uid } };
 
-    const response = await instanceLocketV2.post("acceptFriendRequest", body);
+    const response = await api.post("/locket/proxy/acceptFriendRequest", body);
 
     const acceptedUid = response?.data?.result?.data?.user_uid || uid;
     if (!acceptedUid) throw new Error("Không nhận được UID hợp lệ từ server");
-    // ✅ Lấy chi tiết user từ API
     const newFriend = await fetchUserById(acceptedUid);
-    // ✅ Chuẩn hoá dữ liệu friend
     const normalized = normalizeFriendDataV2(newFriend);
-    // ✅ Trả về kết quả đồng nhất
     return normalized;
   } catch (error) {
     console.error(
       "❌ Lỗi khi chấp nhận lời mời:",
       error.response?.data || error.message,
     );
-    return null; // fallback an toàn
+    return null;
   }
 };
 
@@ -91,7 +87,7 @@ export const removeFriend = async (uid) => {
       },
     };
 
-    const response = await instanceLocketV2.post("removeFriend", body);
+    const response = await api.post("/locket/proxy/removeFriend", body);
     return response.data?.result?.data?.user_uid;
   } catch (error) {
     console.error("❌ Lỗi khi xoá bạn:", error);
@@ -106,7 +102,7 @@ export const toggleHiddenFriend = async (uid) => {
     },
   };
 
-  const response = await instanceLocketV2.post("toggleFriendHidden", body);
+  const response = await api.post("/locket/proxy/toggleFriendHidden", body);
 
   return {
     success: response.status === 200,

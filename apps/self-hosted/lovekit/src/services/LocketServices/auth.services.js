@@ -1,4 +1,4 @@
-import { instanceLocketV2 } from "@/lib/axios.locket";
+import api from "@/lib/axios";
 
 export const ValidateEmailAddress = async (email) => {
   try {
@@ -9,13 +9,11 @@ export const ValidateEmailAddress = async (email) => {
         platform: "ios",
       },
     };
-    const res = await instanceLocketV2.post("validateEmailAddress", body);
+    const res = await api.post("/locket/proxy/validateEmailAddress", body);
     return res.data;
   } catch (error) {
-    console.log(error);
-
     if (error.response && error.response.data?.error) {
-      throw error.response.data.error; // ⬅️ Ném lỗi từ `error.response.data.error`
+      throw error.response.data.error;
     }
     console.error("❌ Network Error:", error.message);
     throw new Error(
