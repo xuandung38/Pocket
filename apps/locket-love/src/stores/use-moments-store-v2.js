@@ -21,7 +21,7 @@
 // Consumers should derive sorted arrays via the `selectMomentsArray` helper below.
 
 import { create } from "zustand";
-import { getAllMoments, deleteMoment as svcDeleteMoment } from "@/services/LocketServices/moment.services";
+import { getAllMoments, deleteMoment as svcDeleteMoment } from "@/services/moment-services";
 import { MOMENTS_CONFIG } from "@/config";
 
 const { initialVisible = 50, loadMoreLimit = 50 } = MOMENTS_CONFIG ?? {};

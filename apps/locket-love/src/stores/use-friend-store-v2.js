@@ -20,7 +20,7 @@
 // All errors are logged + swallowed so the UI never breaks on transient failures.
 
 import { create } from "zustand";
-import { diffFriendIds } from "./friend.diff";
+import { diffFriendIds } from "./friend-diff";
 import {
   getFriends,
   fetchUserDetails,
@@ -29,7 +29,7 @@ import {
   acceptFriendRequest as svcAcceptRequest,
   denyFriendRequest as svcDenyRequest,
   cancelFriendRequest as svcCancelRequest,
-} from "@/services/LocketServices/friend.services";
+} from "@/services/friend-services";
 
 // Sort helper — celebrities first, otherwise stable by uid.
 function sortCelebFirst(list) {
