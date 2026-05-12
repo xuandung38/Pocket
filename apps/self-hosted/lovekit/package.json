@@ -1,0 +1,35 @@
+{
+  "name": "lovekit",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "4.1.13",
+    "axios": "^1.8.1",
+    "clsx": "^2.1.1",
+    "dexie": "^4.0.11",
+    "lucide-react": "^0.563.0",
+    "prop-types": "^15.8.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-easy-crop": "^5.5.7",
+    "socket.io-client": "^4.8.1",
+    "sonner": "^2.0.7",
+    "swiper": "^12.0.3",
+    "uuid": "^13.0.2",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "daisyui": "^5.0.0",
+    "tailwindcss": "4.1.13",
+    "vite": "^6.2.5",
+    "vite-plugin-pwa": "^1.0.0"
+  }
+}

@@ -73,18 +73,20 @@ class LocketController {
   async getMoments(req, res, next) {
     try {
       const { idToken, localId } = req.user;
-      const { timestamp, friendId, limit, syncToken } = req.body;
+      const { friendId, limit, syncToken } = req.body;
 
-      const data = await postServices.getLocketMomentsFromAPI(idToken, localId, {
-        timestamp,
-        friendId,
-        limit,
-        syncToken,
-      });
+      // Use Firestore REST API (no AppCheck required) instead of Callable Function
+      const data = await postServices.getLocketMoments(
+        idToken,
+        localId,
+        syncToken || null,
+        friendId || null,
+        limit || 20,
+      );
 
       return res.status(200).json({
         data: data.moments,
-        syncToken: data.syncToken,
+        syncToken: data.nextPageToken,
         success: true,
         message: "ok",
       });

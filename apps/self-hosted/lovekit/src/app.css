@@ -1,0 +1,79 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+@import "tailwindcss";
+
+@plugin "daisyui" {
+  themes: lovekit --default;
+}
+
+@plugin "daisyui/theme" {
+  name: "lovekit";
+  default: true;
+  prefersdark: false;
+  color-scheme: light;
+
+  --color-primary: #f97316;
+  --color-primary-content: #fffbf0;
+  --color-secondary: #fbbf24;
+  --color-secondary-content: #431407;
+  --color-accent: #fb923c;
+  --color-accent-content: #431407;
+  --color-neutral: #431407;
+  --color-neutral-content: #fffbf0;
+  --color-base-100: #fffbf0;
+  --color-base-200: #fef3c7;
+  --color-base-300: #fde68a;
+  --color-base-content: #431407;
+  --color-info: #38bdf8;
+  --color-info-content: #082f49;
+  --color-success: #22c55e;
+  --color-success-content: #052e16;
+  --color-warning: #f59e0b;
+  --color-warning-content: #431407;
+  --color-error: #ef4444;
+  --color-error-content: #fffbf0;
+
+  --radius-selector: 0.75rem;
+  --radius-field: 9999px;
+  --radius-box: 1.5rem;
+
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+:root,
+[data-theme="lovekit"] {
+  font-family:
+    "Plus Jakarta Sans",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  background: var(--color-base-100);
+}
+
+body {
+  margin: 0;
+  overscroll-behavior: none;
+}
+
+/* Hide scrollbars on touch surfaces while keeping scroll behavior. */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
