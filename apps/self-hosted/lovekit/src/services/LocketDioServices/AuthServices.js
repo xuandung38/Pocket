@@ -168,9 +168,8 @@ export const GetUserData = async () => {
   return null;
 };
 
-// Legacy SaaS endpoint — see GetUserData note above. Kept for ABI parity
-// with the previous client until consumers (e.g. useAuthStore.fetchUserData)
-// are cleaned up.
+// Legacy SaaS endpoint — see GetUserData note above. Kept exported for ABI
+// parity with the previous client; no in-tree callers remain.
 export const GetUserDataV2 = async () => {
   if (import.meta.env?.DEV) {
     console.warn(

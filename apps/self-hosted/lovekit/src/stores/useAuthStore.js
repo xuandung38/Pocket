@@ -1,11 +1,6 @@
 import { clearAllDB } from "@/cache/configDB";
 import { resetTokenCache } from "@/lib/axios";
-import {
-  GetUserDataV2,
-  GetUserLocket,
-  logout,
-  updateUserInfo,
-} from "@/services";
+import { GetUserLocket, logout, updateUserInfo } from "@/services";
 import { removeToken } from "@/utils";
 import { create } from "zustand";
 
@@ -95,21 +90,6 @@ export const useAuthStore = create((set) => ({
         isAuth: false,
         // loading: false,
       });
-    }
-  },
-
-  fetchUserData: async () => {
-    try {
-      set({ loading: true });
-
-      const planRes = await GetUserDataV2();
-
-      set({
-        loading: false,
-      });
-    } catch (err) {
-      console.error("fetchUserData error:", err);
-      set({ loading: false });
     }
   },
 
