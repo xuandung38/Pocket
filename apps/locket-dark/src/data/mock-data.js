@@ -102,6 +102,7 @@ export const feedMoments = [
     image: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=80",
     caption: "góc nhỏ",
     timeAgo: "2g",
+    date: "2026-05-04", // matches memoriesCalendar key for date-filter on feed
     reactions: ["🔥", "😍", "❤️"],
     // reactions received on this moment (only on own posts)
     reactionList: [
@@ -116,6 +117,7 @@ export const feedMoments = [
     image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&q=80",
     caption: "sos",
     timeAgo: "1ngày",
+    date: "2026-05-08",
     reactions: ["🙁", "😍", "❤️"],
   },
   {
@@ -124,16 +126,81 @@ export const feedMoments = [
     image: "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=600&q=80",
     caption: "My FML",
     timeAgo: "14g",
+    date: "2026-05-08",
     reactions: ["🔥", "😍", "💛"],
   },
 ];
 
-// Calendar data for memories screen — map "YYYY-MM-DD" → photo url
+// Photo pool reused across months to keep the mock dataset small but visually varied
+const PHOTO_POOL = [
+  "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=200&q=70",
+  "https://images.unsplash.com/photo-1551963831-b3b1ca40c98e?w=200&q=70",
+  "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=200&q=70",
+  "https://images.unsplash.com/photo-1518455027359-f3f8164ba6bd?w=200&q=70",
+  "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=200&q=70",
+  "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&q=70",
+];
+
+// Calendar data for memories screen — map "YYYY-MM-DD" → array of photo urls.
+// Length of the array = number of moments captured that day (shown as a badge).
+// Data spans November 2025 → May 2026 (the user can scroll until no more data).
 export const memoriesCalendar = {
-  "2026-05-04": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=200&q=70",
-  "2026-05-08": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=200&q=70",
-  "2026-05-10": "https://images.unsplash.com/photo-1551963831-b3b1ca40c98e?w=200&q=70",
+  // November 2025 (oldest with data)
+  "2025-11-15": [PHOTO_POOL[0], PHOTO_POOL[1]],
+  "2025-11-28": [PHOTO_POOL[2]],
+
+  // December 2025
+  "2025-12-03": [PHOTO_POOL[3]],
+  "2025-12-24": [PHOTO_POOL[4], PHOTO_POOL[5], PHOTO_POOL[0]],
+  "2025-12-31": [PHOTO_POOL[1], PHOTO_POOL[2]],
+
+  // January 2026
+  "2026-01-01": [PHOTO_POOL[3], PHOTO_POOL[4]],
+  "2026-01-14": [PHOTO_POOL[5]],
+  "2026-01-22": [PHOTO_POOL[0]],
+
+  // February 2026
+  "2026-02-09": [PHOTO_POOL[1], PHOTO_POOL[2]],
+  "2026-02-14": [PHOTO_POOL[3], PHOTO_POOL[4], PHOTO_POOL[5], PHOTO_POOL[0]],
+  "2026-02-27": [PHOTO_POOL[1]],
+
+  // March 2026
+  "2026-03-08": [PHOTO_POOL[2]],
+  "2026-03-20": [PHOTO_POOL[3], PHOTO_POOL[4]],
+
+  // April 2026
+  "2026-04-12": [PHOTO_POOL[0]],
+  "2026-04-19": [PHOTO_POOL[1], PHOTO_POOL[2]],
+  "2026-04-25": [PHOTO_POOL[3]],
+
+  // May 2026 (current)
+  "2026-05-04": [PHOTO_POOL[4]],
+  "2026-05-08": [PHOTO_POOL[0], PHOTO_POOL[5], PHOTO_POOL[2]],
+  "2026-05-10": [PHOTO_POOL[1]],
 };
+
+// Generate the list of months to render in chronological order, from the
+// earliest date with data through the current month. The user scrolls up to
+// reach older months and stops when there are no more.
+function buildMemoriesMonths() {
+  const dates = Object.keys(memoriesCalendar);
+  if (dates.length === 0) return [];
+  const earliest = dates.reduce((min, d) => (d < min ? d : min));
+  const [y, m] = earliest.split("-").map(Number);
+  const start = new Date(y, m - 1, 1);
+  // "Current" anchor — matches TODAY in memories-screen
+  const end = new Date(2026, 4, 1); // May 2026
+  const months = [];
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    months.push(new Date(cursor));
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return months;
+}
+
+// Months to render — older above, current month last (bottom of list).
+export const memoriesMonths = buildMemoriesMonths();
 
 export const memoriesStats = {
   lockets: 16,

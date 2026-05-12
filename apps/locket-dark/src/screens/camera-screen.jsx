@@ -5,6 +5,7 @@ import Avatar from "../components/ui/avatar";
 import CaptureButton from "../components/ui/capture-button";
 import BottomNav from "../components/ui/bottom-nav";
 import FriendsSheet from "../components/sheets/friends-sheet";
+import ProfileSheet from "../components/sheets/profile-sheet";
 import { currentUser, friends, photoStrips } from "../data/mock-data";
 
 // Demo photo shown inside viewfinder to simulate camera live feed
@@ -21,6 +22,7 @@ export default function CameraScreen() {
   // returning here from /feed so the very first paint isn't artificial.
   const enterClass = location.key === "default" ? "" : "animate-slide-from-top";
   const [friendsOpen, setFriendsOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   // Track vertical drag for swipe-up gesture (camera → feed)
   const dragStartY = useRef(null);
   // Debounce wheel events so we don't navigate on a tiny scroll tick
@@ -81,7 +83,12 @@ export default function CameraScreen() {
           <Users size={16} />
           <span>{friends.length} người bạn</span>
         </button>
-        <Avatar src={currentUser.avatar} name={currentUser.name} size={38} />
+        <button
+          onClick={() => setProfileOpen(true)}
+          style={{ background: "none", border: "none", padding: 0, cursor: "pointer", borderRadius: "50%" }}
+        >
+          <Avatar src={currentUser.avatar} name={currentUser.name} size={38} />
+        </button>
       </div>
 
       {/* Viewfinder — square 1:1 via paddingBottom trick + outer border ring */}
@@ -228,6 +235,9 @@ export default function CameraScreen() {
 
       {/* Friends invite/manage sheet — opened from "X người bạn" pill */}
       <FriendsSheet open={friendsOpen} onClose={() => setFriendsOpen(false)} />
+
+      {/* Profile sheet — opened from avatar (top-right) */}
+      <ProfileSheet open={profileOpen} onClose={() => setProfileOpen(false)} />
     </div>
   );
 }

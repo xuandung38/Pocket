@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { Bell, Plus, ArrowUp } from "lucide-react";
 
 // At the top of the feed, an upward wheel/swipe goes back to camera (mirrors camera→feed)
@@ -8,6 +8,7 @@ import Avatar from "../components/ui/avatar";
 import AudiencePicker from "../components/ui/audience-picker";
 import BottomNav from "../components/ui/bottom-nav";
 import BottomSheet from "../components/sheets/bottom-sheet";
+import ProfileSheet from "../components/sheets/profile-sheet";
 import { currentUser, feedMoments } from "../data/mock-data";
 
 // Overlay for replying to a friend's moment — blurred photo background + bottom input.
@@ -123,14 +124,15 @@ function ReplyOverlay({ moment, onClose }) {
   );
 }
 
-// Filter moments by audience selection.
-// "all"    → all moments (own + friends)
-// "owner"  → only the current account owner's moments ("Bạn")
-// <id>     → only that specific friend's moments
-function filterMoments(audience) {
-  if (audience === "all") return feedMoments;
-  if (audience === "owner") return feedMoments.filter((m) => m.author.id === currentUser.id);
-  return feedMoments.filter((m) => m.author.id === audience);
+// Filter moments by audience selection + optional date filter.
+// audience: "all" | "owner" | <friendId>
+// date: "YYYY-MM-DD" | null (null = no date filter)
+function filterMoments(audience, date) {
+  let result = feedMoments;
+  if (audience === "owner") result = result.filter((m) => m.author.id === currentUser.id);
+  else if (audience !== "all") result = result.filter((m) => m.author.id === audience);
+  if (date) result = result.filter((m) => m.date === date);
+  return result;
 }
 
 // Common emoji list shown in the "+" picker — covers Locket's typical reactions
@@ -287,8 +289,11 @@ export default function FeedScreen() {
   const [reactionMoment, setReactionMoment] = useState(null);
   const [replyMoment, setReplyMoment] = useState(null);
   const [emojiPickerMoment, setEmojiPickerMoment] = useState(null);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [toast, setToast] = useState(null); // string shown briefly after sending
-  const moments = useMemo(() => filterMoments(audience), [audience]);
+  const [searchParams] = useSearchParams();
+  const dateFilter = searchParams.get("date"); // "YYYY-MM-DD" from /memories cell click
+  const moments = useMemo(() => filterMoments(audience, dateFilter), [audience, dateFilter]);
   const navigate = useNavigate();
   const location = useLocation();
   // Slide-in from below on every visit (user always navigates here from another screen)
@@ -351,7 +356,12 @@ export default function FeedScreen() {
           <Bell size={22} />
         </button>
         <AudiencePicker value={audience} onChange={setAudience} />
-        <Avatar src={currentUser.avatar} name={currentUser.name} size={36} />
+        <button
+          onClick={() => setProfileOpen(true)}
+          style={{ background: "none", border: "none", padding: 0, cursor: "pointer", borderRadius: "50%" }}
+        >
+          <Avatar src={currentUser.avatar} name={currentUser.name} size={36} />
+        </button>
       </div>
 
       {/* Vertical snap scroller — one moment per snap, swipe up/down to navigate.
@@ -394,6 +404,9 @@ export default function FeedScreen() {
 
       {/* Reply overlay — friend's moment message bar opens this */}
       <ReplyOverlay moment={replyMoment} onClose={() => setReplyMoment(null)} />
+
+      {/* Profile sheet — opened from avatar (top-right) */}
+      <ProfileSheet open={profileOpen} onClose={() => setProfileOpen(false)} />
 
       {/* Emoji picker — opened from "+" button on friend's message bar */}
       <BottomSheet
