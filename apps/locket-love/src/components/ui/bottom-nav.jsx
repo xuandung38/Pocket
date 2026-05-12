@@ -1,6 +1,26 @@
 import { useNavigate, useLocation } from "react-router-dom";
 
-// Grid icon — for memories/calendar tab
+// 5-tab shell nav (Camera | Feed | Profile | Messages | Activity) — replaces the
+// legacy 3-tab Locket-dark layout. Tabs map to routes registered in App.jsx;
+// active state derives from current pathname (with a small set of aliases so
+// e.g. /chats AND /messages both highlight the Messages tab).
+//
+// Owned at the dev-10 nav-shell level. Phases that add tab-specific UX (Phase
+// 7 activity, Phase 8 profile polish) should swap their icon/label here.
+
+// Inline icons kept here to avoid a circular dep on screen-level libs.
+
+function HomeIcon() {
+  // Camera/home ring with center dot — looks identical for active/inactive,
+  // tint is driven by parent button `color`.
+  return (
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+      <circle cx="16" cy="16" r="13" stroke="currentColor" strokeWidth="2.5" />
+      <circle cx="16" cy="16" r="5" fill="currentColor" />
+    </svg>
+  );
+}
+
 function GridIcon({ filled }) {
   return (
     <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
@@ -23,17 +43,29 @@ function GridIcon({ filled }) {
   );
 }
 
-// Camera/Home icon — always an outlined ring with a center dot; active = white, inactive = dim
-function HomeIcon({ filled }) {
+function UserIcon({ filled }) {
   return (
-    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-      <circle cx="16" cy="16" r="13" stroke="currentColor" strokeWidth="2.5" />
-      <circle cx="16" cy="16" r="5" fill="currentColor" />
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+      {filled ? (
+        <path
+          d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.42 0-8 2.69-8 6v2h16v-2c0-3.31-3.58-6-8-6Z"
+          fill="currentColor"
+        />
+      ) : (
+        <>
+          <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="2" />
+          <path
+            d="M4 21v-1c0-3.31 3.58-6 8-6s8 2.69 8 6v1"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+        </>
+      )}
     </svg>
   );
 }
 
-// Chat icon
 function ChatIcon({ filled }) {
   return (
     <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
@@ -54,11 +86,40 @@ function ChatIcon({ filled }) {
   );
 }
 
+function HeartIcon({ filled }) {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+      {filled ? (
+        <path
+          d="M12 21s-7-4.5-9.5-9C.5 8 3 4 7 4c2 0 3.5 1 5 3 1.5-2 3-3 5-3 4 0 6.5 4 4.5 8C19 16.5 12 21 12 21Z"
+          fill="currentColor"
+        />
+      ) : (
+        <path
+          d="M12 21s-7-4.5-9.5-9C.5 8 3 4 7 4c2 0 3.5 1 5 3 1.5-2 3-3 5-3 4 0 6.5 4 4.5 8C19 16.5 12 21 12 21Z"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinejoin="round"
+        />
+      )}
+    </svg>
+  );
+}
+
+// Tab list — single source of truth. `aliases` highlight the tab even when
+// the active path differs (e.g. legacy /chats alongside new /messages).
 const tabs = [
-  { path: "/memories", label: "Kỷ niệm", Icon: GridIcon },
-  { path: "/", label: "Camera", Icon: HomeIcon },
-  { path: "/chats", label: "Trò chuyện", Icon: ChatIcon },
+  { key: "camera", path: "/", aliases: [], label: "Camera", Icon: HomeIcon },
+  { key: "feed", path: "/feed", aliases: ["/memories"], label: "Feed", Icon: GridIcon },
+  { key: "profile", path: "/profile", aliases: [], label: "Hồ sơ", Icon: UserIcon },
+  { key: "messages", path: "/chats", aliases: ["/messages"], label: "Tin nhắn", Icon: ChatIcon },
+  { key: "activity", path: "/activity", aliases: [], label: "Hoạt động", Icon: HeartIcon },
 ];
+
+function isActiveTab(pathname, tab) {
+  if (pathname === tab.path) return true;
+  return tab.aliases.some((alias) => pathname === alias || pathname.startsWith(`${alias}/`));
+}
 
 export default function BottomNav() {
   const navigate = useNavigate();
@@ -80,12 +141,15 @@ export default function BottomNav() {
         zIndex: 30,
       }}
     >
-      {tabs.map(({ path, Icon }) => {
-        const active = location.pathname === path;
+      {tabs.map((tab) => {
+        const active = isActiveTab(location.pathname, tab);
+        const { Icon, key, path } = tab;
         return (
           <button
-            key={path}
+            key={key}
             onClick={() => navigate(path)}
+            aria-label={tab.label}
+            aria-current={active ? "page" : undefined}
             style={{
               display: "flex",
               flexDirection: "column",
@@ -95,7 +159,7 @@ export default function BottomNav() {
               border: "none",
               cursor: "pointer",
               color: active ? "#ffffff" : "rgba(255,255,255,0.4)",
-              padding: "8px 20px",
+              padding: "8px 14px",
               transition: "color 0.2s",
             }}
           >

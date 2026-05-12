@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 
 import { useAuthStore } from "@/stores";
+import { AppProvider } from "@/context/AppContext";
 
 const CameraScreen = lazy(() => import("./screens/camera-screen"));
 const FeedScreen = lazy(() => import("./screens/feed-screen"));
@@ -11,6 +12,9 @@ const ChatDetailScreen = lazy(() => import("./screens/chat-detail-screen"));
 const PhotoDetailScreen = lazy(() => import("./screens/photo-detail-screen"));
 const SendScreen = lazy(() => import("./screens/send-screen"));
 const LoginScreen = lazy(() => import("./screens/login-screen"));
+const MessagesScreen = lazy(() => import("./screens/messages-screen"));
+const ActivityScreen = lazy(() => import("./screens/activity-screen"));
+const ProfileScreen = lazy(() => import("./screens/profile-screen"));
 
 // Minimal loading fallback — dark OLED bg to avoid flash
 function LoadingFallback() {
@@ -65,20 +69,30 @@ export default function App() {
   }, [forceLogout]);
 
   return (
-    <div className="phone-frame">
-      <Suspense fallback={<LoadingFallback />}>
-        <Routes>
-          <Route path="/login" element={<LoginScreen />} />
-          <Route path="/" element={<RequireAuth><CameraScreen /></RequireAuth>} />
-          <Route path="/feed" element={<RequireAuth><FeedScreen /></RequireAuth>} />
-          <Route path="/memories" element={<RequireAuth><MemoriesScreen /></RequireAuth>} />
-          <Route path="/chats" element={<RequireAuth><ChatListScreen /></RequireAuth>} />
-          <Route path="/chats/:id" element={<RequireAuth><ChatDetailScreen /></RequireAuth>} />
-          <Route path="/photo/:id" element={<RequireAuth><PhotoDetailScreen /></RequireAuth>} />
-          <Route path="/send" element={<RequireAuth><SendScreen /></RequireAuth>} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Suspense>
-    </div>
+    // AppProvider wraps the whole tree so any authed screen (and the login
+    // screen, harmlessly) can call useAppContext() without a re-mount cost.
+    // Sits inside RequireAuth tree-side via routes, but lifting it to the
+    // root keeps the provider stable across navigations.
+    <AppProvider>
+      <div className="phone-frame">
+        <Suspense fallback={<LoadingFallback />}>
+          <Routes>
+            <Route path="/login" element={<LoginScreen />} />
+            <Route path="/" element={<RequireAuth><CameraScreen /></RequireAuth>} />
+            <Route path="/feed" element={<RequireAuth><FeedScreen /></RequireAuth>} />
+            <Route path="/memories" element={<RequireAuth><MemoriesScreen /></RequireAuth>} />
+            <Route path="/chats" element={<RequireAuth><ChatListScreen /></RequireAuth>} />
+            <Route path="/chats/:id" element={<RequireAuth><ChatDetailScreen /></RequireAuth>} />
+            <Route path="/photo/:id" element={<RequireAuth><PhotoDetailScreen /></RequireAuth>} />
+            <Route path="/send" element={<RequireAuth><SendScreen /></RequireAuth>} />
+            {/* Tab destinations added by dev-10 nav shell. Real screens land in later phases. */}
+            <Route path="/messages" element={<RequireAuth><MessagesScreen /></RequireAuth>} />
+            <Route path="/profile" element={<RequireAuth><ProfileScreen /></RequireAuth>} />
+            <Route path="/activity" element={<RequireAuth><ActivityScreen /></RequireAuth>} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
+      </div>
+    </AppProvider>
   );
 }
