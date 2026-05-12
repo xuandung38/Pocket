@@ -1,6 +1,8 @@
 const Router = require("express");
 const router = Router();
 const { getCurrentWeather } = require("../services/Weather/weather-service");
+const { verifyIdToken } = require("../middlewares/verifyToken.js");
+const storageController = require("../controllers/storage.controller.js");
 
 router.post("/weatherV2", async (req, res, next) => {
   try {
@@ -14,5 +16,10 @@ router.post("/weatherV2", async (req, res, next) => {
     next(error);
   }
 });
+
+// Compatibility shim — FE expects R2-style `/api/presignedV3`. Maps to a
+// Firebase resumable upload session under the hood. To be removed when FE
+// migrates to `/locket/initUpload` + `/locket/finalizeUpload` (Phase 05).
+router.post("/presignedV3", verifyIdToken, storageController.presignedV3);
 
 module.exports = router;

@@ -106,12 +106,36 @@ const uploadImageToFirebaseStorage = async (userId, idToken, image) => {
 //#endregion
 
 /**
- * Khởi tạo Firebase resumable upload session cho ảnh.
- * Trả về uploadUrl (client dùng để PUT trực tiếp) và getUrl (để lấy download token).
+ * Khởi tạo Firebase resumable upload session cho ảnh hoặc video.
+ * Trả về uploadUrl (client dùng để PUT trực tiếp) và getUrl (để lấy download token sau khi upload xong).
+ *
+ * @param {string} userId
+ * @param {string} idToken
+ * @param {number} fileSize - kích thước file (bytes)
+ * @param {object} [opts]
+ * @param {string} [opts.type="image"] - "image" hoặc "video"
+ * @param {string} [opts.contentType] - MIME type override (mặc định theo `type`)
+ * @returns {Promise<{ uploadUrl: string, getUrl: string }>}
  */
-const initImageUploadSession = async (userId, idToken, fileSize) => {
-  const imageName = `${Date.now()}_vtd182.webp`;
-  const url = `https://firebasestorage.googleapis.com/v0/b/locket-img/o/users%2F${userId}%2Fmoments%2Fthumbnails%2F${imageName}?uploadType=resumable&name=users%2F${userId}%2Fmoments%2Fthumbnails%2F${imageName}`;
+const initImageUploadSession = async (userId, idToken, fileSize, opts = {}) => {
+  const type = opts.type === "video" ? "video" : "image";
+  const isVideo = type === "video";
+
+  // Bucket / folder / extension / MIME khác nhau giữa ảnh và video.
+  // Match exactly with uploadImage.js (legacy) & uploadVideo.js để CORS + permissions giữ nguyên.
+  const bucket = isVideo ? "locket-video" : "locket-img";
+  const folder = isVideo ? "videos" : "thumbnails";
+  const ext = isVideo ? "mp4" : "webp";
+  const defaultMime = isVideo ? "video/mp4" : "image/webp";
+  const contentType = opts.contentType || defaultMime;
+  // Top-level contentType in the init body uses wildcard form (parity with legacy code paths).
+  const objectContentType = isVideo ? "video/mp4" : "image/*";
+
+  const objectName = `${Date.now()}_vtd182.${ext}`;
+  const objectPath = `users/${userId}/moments/${folder}/${objectName}`;
+  const encodedPath = encodeURIComponent(objectPath);
+
+  const url = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?uploadType=resumable&name=${encodedPath}`;
 
   const response = await fetch(url, {
     method: "POST",
@@ -125,12 +149,12 @@ const initImageUploadSession = async (userId, idToken, fileSize) => {
       "accept-language": "vi-VN,vi;q=0.9",
       "x-firebase-storage-version": "ios/10.13.0",
       "user-agent": "com.locket.Locket/1.43.1 iPhone/17.3 hw/iPhone15_3 (GTMSUF/1)",
-      "x-goog-upload-content-type": "image/webp",
+      "x-goog-upload-content-type": contentType,
       "x-firebase-gmpid": "1:641029076083:ios:cc8eb46290d69b234fa609",
     },
     body: JSON.stringify({
-      name: `users/${userId}/moments/thumbnails/${imageName}`,
-      contentType: "image/*",
+      name: objectPath,
+      contentType: objectContentType,
       bucket: "",
       metadata: { creator: userId, visibility: "private" },
     }),
@@ -143,7 +167,7 @@ const initImageUploadSession = async (userId, idToken, fileSize) => {
   const uploadUrl = response.headers.get("X-Goog-Upload-URL");
   if (!uploadUrl) throw new Error("Firebase did not return upload URL");
 
-  const getUrl = `https://firebasestorage.googleapis.com/v0/b/locket-img/o/users%2F${userId}%2Fmoments%2Fthumbnails%2F${imageName}`;
+  const getUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}`;
 
   return { uploadUrl, getUrl };
 };

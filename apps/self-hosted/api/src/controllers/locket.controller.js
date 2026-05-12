@@ -260,16 +260,20 @@ class LocketController {
   }
 
   // Khởi tạo Firebase upload session — client sẽ upload trực tiếp lên Firebase
+  // Hỗ trợ cả ảnh và video qua opts `{ contentType, type }`.
   async initUpload(req, res, next) {
     try {
       const { idToken, localId } = req.user;
-      const { fileSize } = req.body;
+      const { fileSize, contentType, type } = req.body;
 
       if (!fileSize) {
         return res.status(400).json({ error: "Missing fileSize" });
       }
 
-      const result = await initImageUploadSession(localId, idToken, fileSize);
+      const result = await initImageUploadSession(localId, idToken, fileSize, {
+        contentType,
+        type,
+      });
       return res.status(200).json(result);
     } catch (error) {
       next(error);
