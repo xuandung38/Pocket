@@ -1,5 +1,8 @@
 import { getToken } from "@/utils";
-import { uploadFileAndGetInfoR2 } from "./StorageServices";
+import {
+  uploadFileAndGetInfoR2,
+  uploadFileViaInitFinalize,
+} from "./StorageServices";
 import { useStreakStore } from "@/stores";
 import { SonnerWarning } from "@/components/ui/SonnerToast";
 
@@ -42,16 +45,31 @@ export const createRequestPayloadV5 = async (
       ...(postOverlay.payload && { payload: postOverlay.payload }),
     };
 
-    // Upload qua R2 presigned URL (browser → R2 trực tiếp, VPS không tốn bandwidth upload)
-    const fileInfo = await uploadFileAndGetInfoR2(selectedFile, previewType, localId);
-    const mediaInfo = {
-      url: fileInfo.downloadURL,
-      path: fileInfo.metadata.path,
-      name: fileInfo.metadata.name,
-      size: fileInfo.metadata.size,
-      uploadedAt: fileInfo.metadata.uploadedAt,
-      type: previewType,
-    };
+    // Upload directly to Firebase via /locket/initUpload + /locket/finalizeUpload
+    // (browser → Firebase, VPS bandwidth = 0). For images we use the BE "direct"
+    // path (mediaInfo.imageUrl) which skips the server-side download+reupload.
+    // For videos we still need server-side processing (thumbnail, transcode), so
+    // we use the "indirect" path with url/path/name/size/type fields.
+    const fileInfo = await uploadFileViaInitFinalize(
+      selectedFile,
+      previewType,
+      localId
+    );
+
+    const isVideo = String(previewType).toLowerCase() === "video";
+    const mediaInfo = isVideo
+      ? {
+          url: fileInfo.downloadURL,
+          path: fileInfo.metadata.path,
+          name: fileInfo.metadata.name,
+          size: fileInfo.metadata.size,
+          uploadedAt: fileInfo.metadata.uploadedAt,
+          type: previewType,
+        }
+      : {
+          // BE fast path — postImageToLocketDirect, no server download/reupload
+          imageUrl: fileInfo.downloadURL,
+        };
 
     // Tạo payload cuối cùng
     const payload = {
