@@ -9,6 +9,7 @@ const {
   initImageUploadSession,
   getFirebaseDownloadUrl,
 } = require("../services/FirestorageService");
+const { instanceLocketV2, instanceBeta } = require("../libs");
 const { formatFileSize } = require("../utils/formatFileSize");
 const {
   logWarning,
@@ -18,6 +19,15 @@ const {
 } = require("../utils/logEventUtils");
 
 const MAX_SIZE_MB_UPLOAD = 20; //MB
+
+const LOCKET_PROXY_WHITELIST = new Set([
+  "reactToMoment", "getMomentViews", "getLatestMomentV2",
+  "sendChatMessageV2", "markMomentAsViewed", "deleteMomentV2",
+  "deleteFriendRequest", "acceptFriendRequest", "removeFriend",
+  "toggleFriendHidden", "fetchUserV2", "validateEmailAddress",
+  "getRollcallPosts", "postRollcallReaction", "likeRollcallComment", "postRollcallComment",
+  "markAsRead", "sendChatMessageReaction", "deleteChatMessage", "sendFriendRequestV2",
+]);
 
 class LocketController {
   async login(req, res, next) {
@@ -291,6 +301,79 @@ class LocketController {
       await postServices.deleteLocketMoment(idToken, momentUid);
       return res.status(200).json({ success: true, message: "ok" });
     } catch (error) {
+      next(error);
+    }
+  }
+
+  async getIncomingFriendRequestsV2(req, res, next) {
+    try {
+      const { idToken, localId } = req.user;
+      const { pageToken = null, limit = 10 } = req.body;
+      const result = await friendServices.getIncomingFriendRequests(idToken, localId, pageToken, limit);
+      return res.status(200).json({ success: true, data: result.data, nextPageToken: result.nextPageToken, message: "ok" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getOutgoingFriendRequestsV2(req, res, next) {
+    try {
+      const { idToken, localId } = req.user;
+      const { pageToken = null, limit = 100 } = req.body;
+      const result = await friendServices.getOutgoingFriendRequests(idToken, localId, pageToken, limit);
+      return res.status(200).json({ success: true, data: result.data, nextPageToken: result.nextPageToken, message: "ok" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getUserByData(req, res, next) {
+    try {
+      const { idToken } = req.user;
+      const response = await instanceBeta.post("/locket/getUserByData", req.body, { meta: { idToken } });
+      return res.status(200).json(response.data);
+    } catch (error) {
+      if (error.response) return res.status(error.response.status).json(error.response.data);
+      next(error);
+    }
+  }
+
+  async sendCelebrityRequestV2(req, res, next) {
+    try {
+      const { idToken } = req.user;
+      const response = await instanceBeta.post("/locket/sendCelebrityRequestV2", req.body, { meta: { idToken } });
+      return res.status(200).json(response.data);
+    } catch (error) {
+      if (error.response) return res.status(error.response.status).json(error.response.data);
+      next(error);
+    }
+  }
+
+  // Send friend request via Locket V2 (dedicated route alongside generic proxy entry)
+  async sendFriendRequest(req, res, next) {
+    try {
+      const { idToken } = req.user;
+      const response = await instanceLocketV2.post("sendFriendRequestV2", req.body, { meta: { idToken } });
+      return res.status(200).json(response.data);
+    } catch (error) {
+      if (error.response) return res.status(error.response.status).json(error.response.data);
+      next(error);
+    }
+  }
+
+  async proxyLocket(req, res, next) {
+    try {
+      const { idToken } = req.user;
+      const { endpoint } = req.params;
+      if (!LOCKET_PROXY_WHITELIST.has(endpoint)) {
+        return res.status(400).json({ success: false, message: `Endpoint không được phép: ${endpoint}` });
+      }
+      const response = await instanceLocketV2.post(endpoint, req.body, { meta: { idToken } });
+      return res.status(200).json(response.data);
+    } catch (error) {
+      if (error.response) {
+        return res.status(error.response.status).json(error.response.data);
+      }
       next(error);
     }
   }

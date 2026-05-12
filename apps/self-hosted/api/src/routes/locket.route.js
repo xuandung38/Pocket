@@ -33,4 +33,16 @@ router.post("/deleteMomentV2", verifyIdToken, locketController.deleteMoment);
 router.post("/getAllMessageV2", verifyIdToken, locketController.getMessages);
 router.post("/getMessageWithUserV2", verifyIdToken, locketController.getMessagesWithUser);
 
+// Friend request routes (Firestore-backed)
+router.post("/getIncomingFriendRequestsV2", verifyIdToken, locketController.getIncomingFriendRequestsV2);
+router.post("/getOutgoingFriendRequestsV2", verifyIdToken, locketController.getOutgoingFriendRequestsV2);
+router.post("/sendFriendRequestV2", verifyIdToken, locketController.sendFriendRequest);
+
+// Beta server proxy (api-beta.locket-dio.com)
+router.post("/getUserByData", verifyIdToken, locketController.getUserByData);
+router.post("/sendCelebrityRequestV2", verifyIdToken, locketController.sendCelebrityRequestV2);
+
+// Generic pass-through proxy for Locket callable functions (whitelist-protected)
+router.post("/proxy/:endpoint", verifyIdToken, locketController.proxyLocket);
+
 module.exports = router;
