@@ -1,4 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
+import { useActivityStore, selectActivityUnread } from "@/stores";
 
 // 5-tab shell nav (Camera | Feed | Profile | Messages | Activity) — replaces the
 // legacy 3-tab Locket-dark layout. Tabs map to routes registered in App.jsx;
@@ -121,9 +122,23 @@ function isActiveTab(pathname, tab) {
   return tab.aliases.some((alias) => pathname === alias || pathname.startsWith(`${alias}/`));
 }
 
+// Cap the badge label so a flood of unread notifications doesn't blow up
+// the nav width. Anything above this renders as "N+".
+const BADGE_CAP = 99;
+
+function formatBadgeCount(n) {
+  if (!n || n <= 0) return null;
+  return n > BADGE_CAP ? `${BADGE_CAP}+` : String(n);
+}
+
 export default function BottomNav() {
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Unread count driven by Phase 7 activity store. Opening the Activity tab
+  // mounts ActivityScreen which calls `markRead()` and zeroes this out, so
+  // the badge auto-clears on visit.
+  const activityUnread = useActivityStore(selectActivityUnread);
 
   return (
     <nav
@@ -144,13 +159,20 @@ export default function BottomNav() {
       {tabs.map((tab) => {
         const active = isActiveTab(location.pathname, tab);
         const { Icon, key, path } = tab;
+        const badgeLabel =
+          tab.key === "activity" ? formatBadgeCount(activityUnread) : null;
         return (
           <button
             key={key}
             onClick={() => navigate(path)}
-            aria-label={tab.label}
+            aria-label={
+              badgeLabel
+                ? `${tab.label} (${activityUnread} chưa đọc)`
+                : tab.label
+            }
             aria-current={active ? "page" : undefined}
             style={{
+              position: "relative",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
@@ -165,6 +187,32 @@ export default function BottomNav() {
           >
             <Icon filled={active} />
             {active && <span className="tab-active-dot" />}
+            {badgeLabel && (
+              <span
+                aria-hidden="true"
+                style={{
+                  position: "absolute",
+                  top: 4,
+                  right: 6,
+                  background: "var(--accent-color, #f5a623)",
+                  color: "#fff",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  lineHeight: "14px",
+                  minWidth: 16,
+                  height: 16,
+                  borderRadius: 999,
+                  padding: "0 5px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  pointerEvents: "none",
+                  boxShadow: "0 0 0 2px #0c0c0c",
+                }}
+              >
+                {badgeLabel}
+              </span>
+            )}
           </button>
         );
       })}
