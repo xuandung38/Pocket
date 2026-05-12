@@ -1,15 +1,15 @@
-import { loginHeader } from "@/constants/constrain";
-import { instanceLocket } from "@/lib/axios.locket";
-import { getToken } from "@/utils";
+import api from "@/lib/axios";
 import { generateUUIDv4Upper } from "@/utils/generate/uuid";
+
+// All chat ops route through self-hosted backend proxy.
+// The api interceptor attaches the Authorization header — services
+// no longer touch idToken or Locket-specific headers directly.
 
 export const sendMessage = async (messageInfo) => {
   try {
-    const { idToken } = getToken();
-
     const body = {
       data: {
-        msg: messageInfo.message || " ", // Nội dung tin nhắn
+        msg: messageInfo.message || " ",
         analytics: {
           amplitude: {
             device_id: generateUUIDv4Upper(),
@@ -28,13 +28,7 @@ export const sendMessage = async (messageInfo) => {
       },
     };
 
-    const response = await instanceLocket.post("sendChatMessageV2", body, {
-      headers: {
-        Authorization: `Bearer ${idToken}`,
-        ...loginHeader,
-      },
-    });
-
+    const response = await api.post("/locket/proxy/sendChatMessageV2", body);
     return response.data;
   } catch (err) {
     console.error("sendMessage error:", err);
@@ -44,21 +38,13 @@ export const sendMessage = async (messageInfo) => {
 
 export const markReadMessage = async (conversationId) => {
   try {
-    const { idToken } = getToken();
-
     const body = {
       data: {
         conversation_uid: conversationId,
       },
     };
 
-    const response = await instanceLocket.post("markAsRead", body, {
-      headers: {
-        Authorization: `Bearer ${idToken}`,
-        ...loginHeader,
-      },
-    });
-
+    const response = await api.post("/locket/proxy/markAsRead", body);
     return response.data;
   } catch (err) {
     console.error("markReadMessage error:", err);
@@ -68,8 +54,6 @@ export const markReadMessage = async (conversationId) => {
 
 export const sendReactionOnMessage = async (reactionData) => {
   try {
-    const { idToken } = getToken();
-
     const body = {
       data: {
         message_id: reactionData.messageId,
@@ -78,28 +62,19 @@ export const sendReactionOnMessage = async (reactionData) => {
       },
     };
 
-    const response = await instanceLocket.post(
-      "sendChatMessageReaction",
-      body,
-      {
-        headers: {
-          Authorization: `Bearer ${idToken}`,
-          ...loginHeader,
-        },
-      }
+    const response = await api.post(
+      "/locket/proxy/sendChatMessageReaction",
+      body
     );
-
     return response.data;
   } catch (err) {
-    console.error("markReadMessage error:", err);
+    console.error("sendReactionOnMessage error:", err);
     throw err;
   }
 };
 
 export const deleteMessage = async (deleteData) => {
   try {
-    const { idToken } = getToken();
-
     const body = {
       data: {
         message_uid: deleteData.message_uid,
@@ -107,16 +82,10 @@ export const deleteMessage = async (deleteData) => {
       },
     };
 
-    const response = await instanceLocket.post("deleteChatMessage", body, {
-      headers: {
-        Authorization: `Bearer ${idToken}`,
-        ...loginHeader,
-      },
-    });
-
+    const response = await api.post("/locket/proxy/deleteChatMessage", body);
     return response.data;
   } catch (err) {
-    console.error("markReadMessage error:", err);
+    console.error("deleteMessage error:", err);
     throw err;
   }
 };
