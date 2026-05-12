@@ -11,12 +11,15 @@ import BottomNav from "../components/ui/bottom-nav";
 import BottomSheet from "../components/sheets/bottom-sheet";
 import ProfileSheet from "../components/sheets/profile-sheet";
 import FriendMomentRow from "../components/friend-moment-row";
+import EmojiStudio from "../components/emoji-studio";
 import {
   useAuthStore,
   useFriendStoreV2,
   useMomentsStoreV2,
   selectMomentsArray,
 } from "@/stores";
+import { sendReactMoment } from "@/services/moment-services";
+import { SonnerError } from "../components/ui/sonner-toast";
 
 // -------------------------------------------------------------------------
 // Backend moment shape varies across endpoints/proxies — read defensively.
@@ -216,13 +219,6 @@ function ReplyOverlay({ moment, authorName, image, onClose }) {
     </div>
   );
 }
-
-// Common emoji list shown in the "+" picker — covers Locket's typical reactions
-const EMOJI_REACTIONS = [
-  "🔥", "😍", "❤️", "🙁", "😂", "😮",
-  "👏", "🥰", "😎", "🥹", "🤣", "✨",
-  "💀", "💯", "🙌", "😭", "🤔", "👀",
-];
 
 // Default emoji set rendered on the "Gửi tin nhắn..." row when the backend
 // hasn't shipped per-moment reaction suggestions yet.
@@ -532,9 +528,29 @@ export default function FeedScreen() {
     return () => observer.disconnect();
   }, [canPaginate, hasMore, isLoadingMore, loading, loadMoreOlder, moments.length]);
 
-  function sendReaction(emoji) {
-    // Phase 7 wires the real reaction API; for now keep the visual confirm.
+  // Quick-tap reaction on a friend's moment. Optimistically toasts then fires
+  // POST /locket/proxy/reactToMoment; rolls the toast back on failure so users
+  // see an honest signal rather than a silent miss.
+  async function sendReaction(moment, emoji) {
+    if (!moment?.id) return;
     setToast(`Đã gửi ${emoji}`);
+    setEmojiPickerMoment(null);
+    try {
+      const res = await sendReactMoment(emoji, moment.id, 0);
+      if (res == null) {
+        // sendReactMoment swallows transport errors and returns null on
+        // failure — surface a toast so the user knows the tap didn't land.
+        SonnerError("Gửi cảm xúc thất bại!");
+      }
+    } catch (err) {
+      console.error("[feed-screen] sendReaction failed:", err);
+      SonnerError("Gửi cảm xúc thất bại!");
+    }
+  }
+
+  // After EmojiStudio resolves, just close the picker state. EmojiStudio owns
+  // its own success/error toasts via sonner so we don't double-toast here.
+  function handleEmojiStudioSent() {
     setEmojiPickerMoment(null);
   }
 
@@ -642,7 +658,7 @@ export default function FeedScreen() {
                 author={author}
                 onOpenReactions={setReactionMoment}
                 onOpenReply={() => setReplyMoment(m)}
-                onSendQuickReaction={sendReaction}
+                onSendQuickReaction={(emoji) => sendReaction(m, emoji)}
                 onOpenEmojiPicker={() => setEmojiPickerMoment(m)}
               />
             );
@@ -709,41 +725,15 @@ export default function FeedScreen() {
       {/* Profile sheet — opened from avatar (top-right) */}
       <ProfileSheet open={profileOpen} onClose={() => setProfileOpen(false)} />
 
-      {/* Emoji picker — opened from "+" button on friend's message bar */}
-      <BottomSheet
+      {/* Emoji picker — opened from "+" button on friend's message bar.
+          EmojiStudio owns the network call (sendReactionOnMoment) + its own
+          success/error toasts; we just track the open state and clear it after. */}
+      <EmojiStudio
         open={!!emojiPickerMoment}
+        momentUid={emojiPickerMoment?.id ?? null}
         onClose={() => setEmojiPickerMoment(null)}
-        title="Chọn phản ứng"
-      >
-        <div
-          style={{
-            padding: "12px 16px 24px",
-            display: "grid",
-            gridTemplateColumns: "repeat(6, 1fr)",
-            gap: 12,
-          }}
-        >
-          {EMOJI_REACTIONS.map((e) => (
-            <button
-              key={e}
-              onClick={() => sendReaction(e)}
-              style={{
-                aspectRatio: "1 / 1",
-                fontSize: 28,
-                background: "var(--bg-elevated)",
-                border: "none",
-                borderRadius: 14,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {e}
-            </button>
-          ))}
-        </div>
-      </BottomSheet>
+        onSent={handleEmojiStudioSent}
+      />
 
       {/* Toast — confirms reaction sent. Auto-dismiss after 1.8s */}
       {toast && (

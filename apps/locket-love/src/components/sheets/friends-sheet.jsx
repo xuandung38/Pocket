@@ -1,17 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, X, ChevronRight, UserPlus } from "lucide-react";
+import { Search, X, ChevronRight } from "lucide-react";
 import BottomSheet from "./bottom-sheet";
 import Avatar from "../ui/avatar";
+import {
+  FindFriend,
+  IncomingRequests,
+  OutgoingRequest,
+} from "@/components/friends";
 import { useAuthStore, useFriendStoreV2 } from "@/stores";
 import { FRIENDS_LIMIT } from "../../data/mock-data";
 
 // Friend invite/manage sheet — opens when tapping the "X người bạn" pill on camera screen.
-// Wired to useFriendStoreV2 in Phase 4:
-//   - Default view → real friends + pending request lists from the store.
-//   - Search view → currently disabled (BE search shipped in Phase 7).
+// Composition (top → bottom):
+//   1. FindFriend       — username/phone search + send request (dev-9, Phase 7)
+//   2. IncomingRequests — accept/deny pending invites           (dev-9, Phase 7)
+//   3. OutgoingRequest  — withdraw outgoing invites             (dev-9, Phase 7)
+//   4. Local friend filter + friend list (existing)
+//   5. Share-link section (static deep-links)
 //
-// We keep the share-link section static since those are deep-links, not API
-// driven.
+// The previous inline "search" input is kept as a local filter over the friend
+// list only — the FindFriend component above handles the cross-account search
+// against the backend. Sections render unconditionally so empty states from
+// dev-9's components stay visible (their own empty-state copy is friendlier).
 
 const SHARE_TARGETS = [
   { id: "messenger", label: "Messenger", icon: "💬", color: "#0078ff" },
@@ -38,12 +48,8 @@ export default function FriendsSheet({ open, onClose }) {
 
   const friends = useFriendStoreV2((s) => s.friends);
   const pendingIn = useFriendStoreV2((s) => s.pendingIn);
-  const pendingOut = useFriendStoreV2((s) => s.pendingOut);
   const friendsLoading = useFriendStoreV2((s) => s.loading);
   const loadFriends = useFriendStoreV2((s) => s.loadFriends);
-  const acceptRequest = useFriendStoreV2((s) => s.acceptRequest);
-  const denyRequest = useFriendStoreV2((s) => s.denyRequest);
-  const cancelRequest = useFriendStoreV2((s) => s.cancelRequest);
   const removeFriendLocal = useFriendStoreV2((s) => s.removeFriendLocal);
 
   const user = useAuthStore((s) => s.user);
@@ -91,8 +97,23 @@ export default function FriendsSheet({ open, onClose }) {
           </div>
         </div>
 
-        {/* Search input — filters the in-memory friend list. Cross-account
-            user search lands in Phase 7 when the BE search endpoint is wired. */}
+        {/* 1) Cross-account user search + send-request CTA (dev-9 Phase 7). */}
+        <div style={{ marginBottom: 18 }}>
+          <FindFriend />
+        </div>
+
+        {/* 2) Incoming requests — accept/deny */}
+        <div style={{ marginBottom: 18 }}>
+          <IncomingRequests />
+        </div>
+
+        {/* 3) Outgoing requests — cancel */}
+        <div style={{ marginBottom: 18 }}>
+          <OutgoingRequest />
+        </div>
+
+        {/* Local filter — narrows the friend list rendered below. Separate
+            from the FindFriend cross-account search above. */}
         <div
           style={{
             display: "flex",
@@ -108,7 +129,7 @@ export default function FriendsSheet({ open, onClose }) {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Tìm bạn theo tên hoặc @username"
+            placeholder="Lọc bạn theo tên hoặc @username"
             style={{
               flex: 1,
               background: "none",
@@ -136,24 +157,7 @@ export default function FriendsSheet({ open, onClose }) {
           )}
         </div>
 
-        {/* Incoming friend requests — actionable accept/deny */}
-        {pendingIn?.length > 0 && (
-          <PendingIncomingSection
-            requests={pendingIn}
-            onAccept={acceptRequest}
-            onDeny={denyRequest}
-          />
-        )}
-
-        {/* Outgoing friend requests — show with cancel option */}
-        {pendingOut?.length > 0 && (
-          <PendingOutgoingSection
-            requests={pendingOut}
-            onCancel={cancelRequest}
-          />
-        )}
-
-        {/* Friend list — real data from store. Loading shimmer on cold load. */}
+        {/* 4) Friend list — real data from store. Loading shimmer on cold load. */}
         <FriendsSection
           friends={filteredFriends}
           loading={friendsLoading}
@@ -208,118 +212,9 @@ export default function FriendsSheet({ open, onClose }) {
 }
 
 // ---------- Section components -----------------------------------------
-
-function PendingIncomingSection({ requests, onAccept, onDeny }) {
-  return (
-    <>
-      <SectionLabel
-        icon={<UserPlus size={18} color="var(--text-secondary)" />}
-        text={`Lời mời đang chờ (${requests.length})`}
-      />
-      <div style={{ display: "flex", flexDirection: "column", marginBottom: 22 }}>
-        {requests.map((r) => {
-          const p = presentFriend(r, "Người dùng");
-          return (
-            <div
-              key={`in-${p.uid}`}
-              style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0" }}
-            >
-              <Avatar src={p.avatar} name={p.name} size={44} />
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-                <span style={{ fontSize: 15, fontWeight: 600 }}>{p.name}</span>
-                {p.username && (
-                  <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-                    @{p.username}
-                  </span>
-                )}
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  onClick={() => onAccept?.(p.uid)}
-                  style={{
-                    background: "var(--accent-yellow)",
-                    color: "#000",
-                    border: "none",
-                    borderRadius: 999,
-                    padding: "8px 14px",
-                    fontSize: 13,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
-                >
-                  Chấp nhận
-                </button>
-                <button
-                  onClick={() => onDeny?.(p.uid)}
-                  aria-label="Từ chối"
-                  style={{
-                    background: "var(--bg-elevated)",
-                    color: "var(--text-secondary)",
-                    border: "none",
-                    borderRadius: 999,
-                    padding: 8,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                  }}
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </>
-  );
-}
-
-function PendingOutgoingSection({ requests, onCancel }) {
-  return (
-    <>
-      <SectionLabel
-        icon={<span style={{ fontSize: 16 }}>✉️</span>}
-        text={`Đã gửi (${requests.length})`}
-      />
-      <div style={{ display: "flex", flexDirection: "column", marginBottom: 22 }}>
-        {requests.map((r) => {
-          const p = presentFriend(r, "Người dùng");
-          return (
-            <div
-              key={`out-${p.uid}`}
-              style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0" }}
-            >
-              <Avatar src={p.avatar} name={p.name} size={44} />
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-                <span style={{ fontSize: 15, fontWeight: 600 }}>{p.name}</span>
-                {p.username && (
-                  <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-                    @{p.username}
-                  </span>
-                )}
-              </div>
-              <button
-                onClick={() => onCancel?.(p.uid)}
-                style={{
-                  background: "var(--bg-elevated)",
-                  color: "var(--text-secondary)",
-                  border: "none",
-                  borderRadius: 999,
-                  padding: "8px 14px",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                Huỷ
-              </button>
-            </div>
-          );
-        })}
-      </div>
-    </>
-  );
-}
+// Incoming + outgoing request sections now live in @/components/friends
+// (dev-9 Phase 7). FriendsSection is kept here since it's a thin local
+// renderer over the V2 store list, not a reusable feature module.
 
 function FriendsSection({ friends, loading, hasSearch, onRemove }) {
   if (loading && friends.length === 0) {
