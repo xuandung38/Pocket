@@ -20,6 +20,8 @@ const defaultBucket = () => ({
   hasMore: true,
   isLoadingMore: false,
   visibleCount: initialVisible,
+  // syncToken: BE-provided cursor for next page; null means no more pages.
+  syncToken: null,
 });
 
 /* --------------------------------------------------
@@ -92,26 +94,32 @@ export const useMomentsStoreV2 = create((set, get) => ({
       }
 
       /* ---------- API sync ---------- */
-      const apiData = await GetAllMoments({
-        timestamp: Math.floor(Date.now() / 1000),
+      const { items: apiData, syncToken } = await GetAllMoments({
         friendId: selectedFriendUid,
         limit: initialVisible,
       });
 
-      if (apiData?.length) {
-        set((state) => {
-          const bucket = state.momentsByUser[key] ?? defaultBucket();
-          return {
-            momentsByUser: {
-              ...state.momentsByUser,
-              [key]: {
-                ...bucket,
-                items: [...apiData].sort((a, b) => b.createTime - a.createTime),
-              },
+      // Always persist syncToken + hasMore even when items empty, so pagination
+      // state is correct (e.g. account has zero moments → hasMore=false).
+      set((state) => {
+        const bucket = state.momentsByUser[key] ?? defaultBucket();
+        const nextItems = apiData?.length
+          ? [...apiData].sort((a, b) => b.createTime - a.createTime)
+          : bucket.items;
+        return {
+          momentsByUser: {
+            ...state.momentsByUser,
+            [key]: {
+              ...bucket,
+              items: nextItems,
+              syncToken,
+              hasMore: !!syncToken,
             },
-          };
-        });
+          },
+        };
+      });
 
+      if (apiData?.length) {
         // cache lại local
         await bulkAddMoments(apiData);
       }
@@ -179,31 +187,36 @@ export const useMomentsStoreV2 = create((set, get) => ({
       }
 
       /* ---------- API sync ---------- */
-      const apiData = await GetAllMoments({
-        timestamp: Math.floor(Date.now() / 1000),
+      const { items: apiData, syncToken } = await GetAllMoments({
         friendId: selectedFriendUid,
         limit: initialVisible,
       });
 
-      if (apiData?.length) {
-        set((state) => {
-          const bucket = state.momentsByUser[key] ?? defaultBucket();
-          return {
-            momentsByUser: {
-              ...state.momentsByUser,
-              [key]: {
-                ...bucket,
-                items: [...apiData].sort((a, b) => b.createTime - a.createTime),
-              },
+      // reloadMoments replaces page-1 view; reset syncToken + hasMore from BE.
+      set((state) => {
+        const bucket = state.momentsByUser[key] ?? defaultBucket();
+        const nextItems = apiData?.length
+          ? [...apiData].sort((a, b) => b.createTime - a.createTime)
+          : bucket.items;
+        return {
+          momentsByUser: {
+            ...state.momentsByUser,
+            [key]: {
+              ...bucket,
+              items: nextItems,
+              syncToken,
+              hasMore: !!syncToken,
             },
-          };
-        });
+          },
+        };
+      });
 
+      if (apiData?.length) {
         // cache lại local
         await bulkAddMoments(apiData);
       }
     } catch (err) {
-      console.error("❌ fetchMoments error:", err);
+      console.error("❌ reloadMoments error:", err);
     } finally {
       set((state) => {
         const bucket = state.momentsByUser[key];
@@ -229,7 +242,16 @@ export const useMomentsStoreV2 = create((set, get) => ({
     const bucket = get().momentsByUser[key];
     if (!bucket) return;
 
-    if (bucket.isLoadingMore || !bucket.hasMore || !bucket.items.length) {
+    // `loading` guard: avoids a race where local-cache hydrate populated
+    // items but initial API fetch hasn't yet returned a `syncToken`. Without
+    // this, loadMore would observe syncToken=null and incorrectly flip
+    // hasMore=false before we ever paginate.
+    if (
+      bucket.loading ||
+      bucket.isLoadingMore ||
+      !bucket.hasMore ||
+      !bucket.items.length
+    ) {
       return;
     }
 
@@ -249,51 +271,52 @@ export const useMomentsStoreV2 = create((set, get) => ({
     });
 
     try {
-      const lastCreateTime = bucket.items[bucket.items.length - 1].createTime;
-
-      const older = await GetAllMoments({
-        timestamp: lastCreateTime,
-        friendId: selectedFriendUid,
-        limit: loadMoreLimit,
-      });
-
-      if (!older?.length) {
+      // No cursor → BE has signalled there's no next page. Flip hasMore=false
+      // (defensively; the early-return guard above should already catch this).
+      if (!bucket.syncToken) {
         set((state) => {
           const b = state.momentsByUser[key];
           if (!b) return state;
           return {
             momentsByUser: {
               ...state.momentsByUser,
-              [key]: {
-                ...b,
-                hasMore: false,
-              },
+              [key]: { ...b, hasMore: false },
             },
           };
         });
         return;
       }
 
+      const { items: older, syncToken: nextToken } = await GetAllMoments({
+        friendId: selectedFriendUid,
+        limit: loadMoreLimit,
+        syncToken: bucket.syncToken,
+      });
+
+      // Always advance cursor + hasMore from BE response, even on empty page.
       set((state) => {
         const b = state.momentsByUser[key];
         if (!b) return state;
 
         const existingIds = new Set(b.items.map((i) => i.id));
-        const filtered = older.filter((m) => !existingIds.has(m.id));
+        const filtered = (older ?? []).filter((m) => !existingIds.has(m.id));
 
         return {
           momentsByUser: {
             ...state.momentsByUser,
             [key]: {
               ...b,
-              items: [...b.items, ...filtered],
-              hasMore: older.length === loadMoreLimit,
+              items: filtered.length ? [...b.items, ...filtered] : b.items,
+              syncToken: nextToken,
+              hasMore: !!nextToken,
             },
           },
         };
       });
 
-      await bulkAddMoments(older);
+      if (older?.length) {
+        await bulkAddMoments(older);
+      }
     } catch (err) {
       console.error("❌ loadMoreOlder error:", err);
     } finally {
