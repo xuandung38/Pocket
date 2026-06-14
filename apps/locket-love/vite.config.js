@@ -9,6 +9,16 @@ export default defineConfig({
     port: Number(process.env.PORT) || 5175,
     strictPort: false,
     host: true,
+    // Accept any Host header (custom domains / reverse proxies, e.g. locket.mdev).
+    // `true` disables Vite's host check entirely. Fine for self-hosted on a
+    // trusted network; don't expose the raw dev/preview server to the internet.
+    allowedHosts: true,
+  },
+  // The docker image serves via `vite preview`, which has its own host check —
+  // mirror the server setting so production containers accept custom domains too.
+  preview: {
+    host: true,
+    allowedHosts: true,
   },
   resolve: {
     alias: {

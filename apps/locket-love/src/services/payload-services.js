@@ -14,7 +14,7 @@
 import { api } from "@/libs";
 import { getToken } from "@/utils";
 import { SonnerWarning } from "@/components/ui/sonner-toast";
-import { uploadFileViaInitFinalize } from "./storage-services";
+import { uploadFileAndGetInfoR2 } from "./storage-services";
 
 // Decide who actually receives the moment. The BE only honours `recipients`
 // when `audience === "selected"`. For "private" we send the user a copy of
@@ -69,31 +69,27 @@ export const createRequestPayloadV5 = async ({
     ...(overlayData.payload && { payload: overlayData.payload }),
   };
 
-  // Push the media to storage. Errors propagate so the caller can surface a
-  // retry UI (the camera screen catches and shows a Sonner toast).
-  const fileInfo = await uploadFileViaInitFinalize(
+  // Push the media to the self-hosted R2 storage service (presignedV3), exactly
+  // like the web client: the browser PUTs the file straight to R2. This avoids
+  // the direct Firebase Storage resumable PUT, which 400s from a self-hosted
+  // origin. Errors propagate so the caller can surface a retry UI (the camera
+  // screen catches and shows a Sonner toast).
+  const fileInfo = await uploadFileAndGetInfoR2(
     mediaFile,
     previewType,
     localId,
   );
 
-  const isVideo = String(previewType).toLowerCase() === "video";
-
-  // BE accepts two media shapes:
-  //   - direct (image)  : { imageUrl }                — server skips download
-  //   - indirect (video): { url, path, name, size, … } — server downloads, transcodes, thumbnails
-  const mediaInfo = isVideo
-    ? {
-        url: fileInfo.downloadURL,
-        path: fileInfo.metadata.path,
-        name: fileInfo.metadata.name,
-        size: fileInfo.metadata.size,
-        uploadedAt: fileInfo.metadata.uploadedAt,
-        type: previewType,
-      }
-    : {
-        imageUrl: fileInfo.downloadURL,
-      };
+  // One media shape for both image and video: the BE downloads the file from the
+  // R2 URL, then processes / thumbnails it. Mirrors the web payload exactly.
+  const mediaInfo = {
+    url: fileInfo.downloadURL,
+    path: fileInfo.metadata.path,
+    name: fileInfo.metadata.name,
+    size: fileInfo.metadata.size,
+    uploadedAt: fileInfo.metadata.uploadedAt,
+    type: previewType,
+  };
 
   return {
     options: optionsData,

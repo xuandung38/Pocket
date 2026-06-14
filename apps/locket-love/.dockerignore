@@ -5,6 +5,8 @@ dist/
 *.local
 .env.local
 .env.*.local
-.env.production
+# NOTE: .env.production is intentionally NOT ignored — vite bakes its VITE_*
+# values into the bundle at build time (storage/api URLs). It holds only public
+# client config, no secrets.
 .git/
 .DS_Store
