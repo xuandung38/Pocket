@@ -4,12 +4,17 @@
 //   caption chip overlaid on photo (swipeable, 8 slots)
 //   [X | Send | Aa+] action row
 //   Tất cả + per-friend recipient row with real store data
+//
+// For image shots, the static <img> is replaced with a gesture-based PhotoCropper
+//   (pan + pinch-zoom + twist-rotate). On Send, exportBlob(1080) produces a
+//   pre-cropped square File that camera-screen uses as the base for composeFrame.
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Download, X, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import Avatar from "./ui/avatar";
 import BottomSheet from "./sheets/bottom-sheet";
 import FramePicker from "./frame-picker";
+import PhotoCropper from "./photo-cropper";
 import { musicServices } from "../data/mock-data";
 import { useOverlayStore, useFrameStore } from "@/stores";
 
@@ -51,6 +56,9 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
   // selectedFrame: null = no frame; frame object from useFrameStore.frames otherwise.
   const [selectedFrame, setSelectedFrame] = useState(null);
   const dragStartX = useRef(null);
+
+  // Ref forwarded into PhotoCropper; used in handleSend to extract the 1080² crop.
+  const cropperRef = useRef(null);
 
   const { captionOverlays, fetchCaptionOverlays } = useOverlayStore();
   useEffect(() => { fetchCaptionOverlays(); }, [fetchCaptionOverlays]);
@@ -100,20 +108,97 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
     if (Math.abs(dx) >= SWIPE_THRESHOLD) cycleCaption(dx < 0 ? 1 : -1);
   }
 
-  function handleSend() {
+  // Derived state — declared here (above useMemo) so captionForPolaroid is
+  // available inside the frameOverlayNode memo without hitting the const TDZ.
+  const allSelected = selectedRecipients.includes("all");
+  const isAaCaption = sheetCaption?.id === "text";
+  const isMessageSlot = !sheetCaption && captionIndex === 0;
+  const isEditableSlot = isAaCaption || isMessageSlot;
+  const activeSticker = sheetCaption || quickCaptions[captionIndex];
+  // Caption text shown in the polaroid bottom strip preview (mirrors bake output).
+  const captionForPolaroid = isAaCaption ? aaText : customMessage;
+
+  // Build the frame overlay ReactNode for the PhotoCropper (image shots only).
+  // Rendered above the Cropper canvas (pointer-events:none) so users see the
+  // frame while adjusting the crop — without blocking pan/zoom interactions.
+  const frameOverlayNode = useMemo(() => {
+    if (!selectedFrame) return null;
+    if (selectedFrame.type === "png") {
+      return (
+        // crossOrigin mandatory — same reason as the picker thumbnail and
+        // compose-frame: avoids poisoning the CORS-cached response used later
+        // by the canvas bake in composeFrame.
+        <img
+          src={selectedFrame.url}
+          alt=""
+          crossOrigin="anonymous"
+          style={{
+            position: "absolute", inset: 0,
+            width: "100%", height: "100%",
+            objectFit: "cover",
+          }}
+        />
+      );
+    }
+    if (selectedFrame.type === "polaroid") {
+      return (
+        <div style={{ position: "absolute", inset: 0 }}>
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 12, background: "#fff" }} />
+          <div style={{ position: "absolute", top: 12, bottom: 52, left: 0, width: 12, background: "#fff" }} />
+          <div style={{ position: "absolute", top: 12, bottom: 52, right: 0, width: 12, background: "#fff" }} />
+          <div style={{
+            position: "absolute", bottom: 0, left: 0, right: 0, height: 52, background: "#fff",
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
+          }}>
+            <div style={{ fontSize: 9, color: "#999" }}>
+              {new Date().toLocaleDateString("vi-VN")}
+            </div>
+            {captionForPolaroid && (
+              <div style={{
+                fontSize: 11, fontWeight: 600, color: "#333",
+                maxWidth: "80%", textAlign: "center",
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              }}>
+                {captionForPolaroid}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  }, [selectedFrame, captionForPolaroid]);
+
+  async function handleSend() {
     const isAa = sheetCaption?.id === "text";
     const caption = isAa ? aaText : customMessage;
     const allSelected = selectedRecipients.includes("all");
 
     // Build frameSpec to forward to camera-screen for canvas baking.
-    // Polaroid date is intentionally omitted here — camera-screen injects
-    // it at post time so the timestamp reflects actual submission moment.
     let frameSpec = { type: "none" };
     if (selectedFrame) {
       if (selectedFrame.type === "png") {
         frameSpec = { type: "png", url: selectedFrame.url };
       } else if (selectedFrame.type === "polaroid") {
+        // Polaroid date injected at post time in camera-screen so it reflects
+        // actual submission moment — not preview time.
         frameSpec = { type: "polaroid", caption };
+      }
+    }
+
+    // For image shots, export the 1080² crop from the gesture cropper before
+    // sending. camera-screen bakes the frame onto this pre-cropped square.
+    // Falls back to null (camera-screen uses shot.file) if not available.
+    let croppedPhoto = null;
+    if (shot.type === "image" && cropperRef.current?.exportBlob) {
+      try {
+        const blob = await cropperRef.current.exportBlob(1080);
+        if (blob) {
+          croppedPhoto = new File([blob], `cropped_${Date.now()}.jpg`, { type: "image/jpeg" });
+        }
+      } catch (err) {
+        console.warn("[captured-send-preview] exportBlob failed:", err);
+        // croppedPhoto stays null; camera-screen falls back to shot.file
       }
     }
 
@@ -123,40 +208,23 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
       recipients: allSelected ? [] : selectedRecipients,
       overlayData: sheetCaption && sheetCaption.id !== "text" ? { sticker: sheetCaption } : {},
       frame: frameSpec,
+      croppedPhoto,
     });
   }
-
-  const allSelected = selectedRecipients.includes("all");
-  const isAaCaption = sheetCaption?.id === "text";
-  const isMessageSlot = !sheetCaption && captionIndex === 0;
-  const isEditableSlot = isAaCaption || isMessageSlot;
-  const activeSticker = sheetCaption || quickCaptions[captionIndex];
-  // Caption text shown in the polaroid bottom strip preview (mirrors bake output).
-  const captionForPolaroid = isAaCaption ? aaText : customMessage;
 
   return (
     <div
       style={{
-        position: "absolute",
-        inset: 0,
-        background: "#000",
-        display: "flex",
-        flexDirection: "column",
-        zIndex: 5,
+        position: "absolute", inset: 0, background: "#000",
+        display: "flex", flexDirection: "column", zIndex: 5,
       }}
     >
       {/* Header */}
       <div
         style={{
-          flexShrink: 0,
-          height: 52,
-          marginTop: 40,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          position: "relative",
-          paddingLeft: 16,
-          paddingRight: 16,
+          flexShrink: 0, height: 52, marginTop: 40,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          position: "relative", paddingLeft: 16, paddingRight: 16,
         }}
       >
         <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)" }}>
@@ -178,90 +246,90 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
           onPointerUp={handlePhotoPtrUp}
           onPointerCancel={() => (dragStartX.current = null)}
           style={{
-            borderRadius: 28,
-            overflow: "hidden",
-            position: "relative",
-            paddingBottom: "100%",
-            background: "#111",
-            touchAction: "pan-y",
-            userSelect: "none",
+            borderRadius: 28, overflow: "hidden",
+            position: "relative", paddingBottom: "100%",
+            background: "#111", touchAction: "pan-y", userSelect: "none",
+            // Isolate the stacking context so the frame overlay's high z-index
+            // stays contained inside this square — otherwise it paints OVER the
+            // frame-picker BottomSheet (z-40) when the sheet slides up.
+            isolation: "isolate",
           }}
         >
           <div style={{ position: "absolute", inset: 0 }}>
+
             {shot.type === "image" ? (
-              <img
-                src={shot.url}
-                alt="preview"
-                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-              />
+              // Wrap in a stopPropagation div so panning inside the Cropper
+              // doesn't inadvertently fire the caption-swipe gesture above.
+              <div
+                onPointerDown={(e) => e.stopPropagation()}
+                onPointerUp={(e) => e.stopPropagation()}
+                style={{ position: "absolute", inset: 0 }}
+              >
+                <PhotoCropper
+                  src={shot.url}
+                  cropperRef={cropperRef}
+                  frameOverlay={frameOverlayNode}
+                />
+              </div>
             ) : (
-              <video
-                src={shot.url}
-                autoPlay
-                loop
-                muted
-                playsInline
-                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-              />
+              // Video: no Cropper; keep frame overlays for visual preview only
+              // (frames are never baked onto videos in camera-screen).
+              <>
+                <video
+                  src={shot.url}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                />
+                {selectedFrame?.type === "png" && (
+                  <img
+                    src={selectedFrame.url}
+                    alt=""
+                    crossOrigin="anonymous"
+                    style={{
+                      position: "absolute", inset: 0, width: "100%", height: "100%",
+                      objectFit: "cover", pointerEvents: "none", zIndex: 1,
+                    }}
+                  />
+                )}
+                {selectedFrame?.type === "polaroid" && (
+                  <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 1 }}>
+                    <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 12, background: "#fff" }} />
+                    <div style={{ position: "absolute", top: 12, bottom: 52, left: 0, width: 12, background: "#fff" }} />
+                    <div style={{ position: "absolute", top: 12, bottom: 52, right: 0, width: 12, background: "#fff" }} />
+                    <div style={{
+                      position: "absolute", bottom: 0, left: 0, right: 0, height: 52, background: "#fff",
+                      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
+                    }}>
+                      <div style={{ fontSize: 9, color: "#999" }}>{new Date().toLocaleDateString("vi-VN")}</div>
+                      {captionForPolaroid && (
+                        <div style={{
+                          fontSize: 11, fontWeight: 600, color: "#333",
+                          maxWidth: "80%", textAlign: "center",
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        }}>
+                          {captionForPolaroid}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
+            {/* Posting spinner — covers both Cropper and video */}
             {isPosting && (
               <div
                 style={{
-                  position: "absolute",
-                  inset: 0,
-                  background: "rgba(0,0,0,0.55)",
-                  backdropFilter: "blur(4px)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#fff",
-                  zIndex: 3,
+                  position: "absolute", inset: 0,
+                  background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "#fff", zIndex: 10,
                 }}
               >
                 <Loader2 size={28} style={{ animation: "spin 1s linear infinite" }} />
-              </div>
-            )}
-
-            {/* Frame overlay preview — approximates the canvas bake output.
-                PNG: transparent overlay image covering the photo.
-                Polaroid: CSS white border bars + text strip. */}
-            {selectedFrame?.type === "png" && (
-              <img
-                src={selectedFrame.url}
-                alt=""
-                style={{
-                  position: "absolute", inset: 0, width: "100%", height: "100%",
-                  objectFit: "cover", pointerEvents: "none", zIndex: 1,
-                }}
-              />
-            )}
-            {selectedFrame?.type === "polaroid" && (
-              <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 1 }}>
-                {/* Top bar */}
-                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 12, background: "#fff" }} />
-                {/* Left bar */}
-                <div style={{ position: "absolute", top: 12, bottom: 52, left: 0, width: 12, background: "#fff" }} />
-                {/* Right bar */}
-                <div style={{ position: "absolute", top: 12, bottom: 52, right: 0, width: 12, background: "#fff" }} />
-                {/* Bottom strip with date + caption */}
-                <div style={{
-                  position: "absolute", bottom: 0, left: 0, right: 0, height: 52, background: "#fff",
-                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
-                }}>
-                  <div style={{ fontSize: 9, color: "#999" }}>
-                    {new Date().toLocaleDateString("vi-VN")}
-                  </div>
-                  {captionForPolaroid && (
-                    <div style={{
-                      fontSize: 11, fontWeight: 600, color: "#333",
-                      maxWidth: "80%", textAlign: "center",
-                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                    }}>
-                      {captionForPolaroid}
-                    </div>
-                  )}
-                </div>
               </div>
             )}
 
@@ -275,7 +343,7 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
                 background: "rgba(0,0,0,0.35)", backdropFilter: "blur(6px)",
                 borderRadius: "50%", width: 32, height: 32, border: "none",
                 cursor: "pointer", display: "flex", alignItems: "center",
-                justifyContent: "center", color: "rgba(255,255,255,0.85)",
+                justifyContent: "center", color: "rgba(255,255,255,0.85)", zIndex: 5,
               }}
             >
               <ChevronLeft size={18} />
@@ -291,7 +359,7 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
                 background: "rgba(0,0,0,0.35)", backdropFilter: "blur(6px)",
                 borderRadius: "50%", width: 32, height: 32, border: "none",
                 cursor: "pointer", display: "flex", alignItems: "center",
-                justifyContent: "center", color: "rgba(255,255,255,0.85)",
+                justifyContent: "center", color: "rgba(255,255,255,0.85)", zIndex: 5,
               }}
             >
               <ChevronRight size={18} />
@@ -301,7 +369,8 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
             <div
               style={{
                 position: "absolute", bottom: 14, left: "50%",
-                transform: "translateX(-50%)", whiteSpace: "nowrap", maxWidth: "85%",
+                transform: "translateX(-50%)", whiteSpace: "nowrap",
+                maxWidth: "85%", zIndex: 5,
               }}
             >
               {isEditableSlot ? (
@@ -386,7 +455,7 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
           })}
         </div>
 
-        {/* Action bar: X | Send | Aa+ */}
+        {/* Action bar: X | Send | Frame | Aa+ */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", padding: "6px 32px" }}>
           <button
             onClick={onCancel}

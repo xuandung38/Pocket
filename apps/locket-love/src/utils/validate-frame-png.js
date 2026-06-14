@@ -1,12 +1,14 @@
 // validate-frame-png.js
 // Browser-side validation for custom photo-frame PNGs before upload.
-// Checks two requirements:
-//   1. Square: naturalWidth === naturalHeight.
-//   2. Has transparency: at least one pixel with alpha < 255.
+// Checks one requirement:
+//   Has transparency: at least one pixel with alpha < 255.
+// Square enforcement removed — callers crop to 1:1 via FrameCropModal before
+// reaching this validation step, so non-square input should never arrive here.
 // Downscales to 64×64 canvas for a fast pixel scan on large files.
 
 /**
- * Validate that `file` is a square PNG with at least one transparent pixel.
+ * Validate that `file` is a PNG with at least one transparent pixel.
+ * Any aspect ratio is accepted — callers must ensure square dimensions upstream.
  *
  * @param {File} file
  * @returns {Promise<{ ok: boolean, reason?: string }>}
@@ -23,16 +25,7 @@ export async function validateFramePng(file) {
     img.onload = () => {
       URL.revokeObjectURL(objectUrl);
 
-      // 1. Square check
-      if (img.naturalWidth !== img.naturalHeight) {
-        resolve({
-          ok: false,
-          reason: "Khung phải có kích thước vuông (chiều rộng = chiều cao).",
-        });
-        return;
-      }
-
-      // 2. Transparency check — downscale to 64² for speed
+      // Transparency check — downscale to 64² for speed
       const SIZE = 64;
       const canvas = document.createElement("canvas");
       canvas.width = SIZE;

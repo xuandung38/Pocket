@@ -5,6 +5,7 @@
 //   deleteFrame    — DELETE /api/frames/:id
 //   uploadCustomFrame — validate PNG → R2 upload → createFrame (full flow for UI)
 
+import { CONFIG } from "@/config";
 import { api } from "@/libs";
 import { getToken } from "@/utils";
 import { uploadFileAndGetInfoR2 } from "./storage-services";
@@ -15,8 +16,8 @@ import { validateFramePng } from "@/utils/validate-frame-png";
  * @returns {Promise<Array>}
  */
 export const getFrames = async () => {
-  const res = await api.get("/api/frames");
-  // Backend wraps responses as { success, data, message }; unwrap .data.data
+  const res = await api.get(`${CONFIG.api.storage}/api/frames`);
+  // Storage service wraps responses as { data: ... }; unwrap .data.data
   return Array.isArray(res?.data?.data) ? res.data.data : [];
 };
 
@@ -26,8 +27,8 @@ export const getFrames = async () => {
  * @returns {Promise<object>} created frame
  */
 export const createFrame = async ({ name, url, key }) => {
-  const res = await api.post("/api/frames", { name, url, key });
-  // Backend wraps response; unwrap .data.data for the created frame object
+  const res = await api.post(`${CONFIG.api.storage}/api/frames`, { name, url, key });
+  // Storage service wraps response; unwrap .data.data for the created frame object
   return res.data?.data;
 };
 
@@ -37,7 +38,7 @@ export const createFrame = async ({ name, url, key }) => {
  * @returns {Promise<void>}
  */
 export const deleteFrame = async (id) => {
-  await api.delete(`/api/frames/${id}`);
+  await api.delete(`${CONFIG.api.storage}/api/frames/${id}`);
 };
 
 /**

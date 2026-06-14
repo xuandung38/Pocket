@@ -328,7 +328,7 @@ export default function CameraScreen() {
   }, [shot]);
 
   const handlePost = useCallback(
-    async ({ caption = "", audience = "all", recipients = [], overlayData = {}, frame } = {}) => {
+    async ({ caption = "", audience = "all", recipients = [], overlayData = {}, frame, croppedPhoto = null } = {}) => {
       if (!shot?.file) return;
       if (audience === "selected" && recipients.length === 0) {
         SonnerWarning("Hãy chọn ít nhất một người nhận.");
@@ -339,7 +339,12 @@ export default function CameraScreen() {
       try {
         // Bake the chosen frame into the photo before upload.
         // Videos are never framed; "none" is a pass-through (no re-encode).
-        let fileToUpload = shot.file;
+        //
+        // croppedPhoto: pre-cropped 1080² File from the Cropper.js send preview.
+        // When present it is used as the base instead of shot.file so
+        // composeFrame overlays the frame onto the already-square crop.
+        // Fallback to shot.file if the Cropper wasn't ready (e.g. video).
+        let fileToUpload = croppedPhoto || shot.file;
         if (shot.type === "image" && frame && frame.type !== "none") {
           const frameSpec = { ...frame };
           // Inject the post timestamp for the polaroid date strip.
@@ -347,11 +352,12 @@ export default function CameraScreen() {
             frameSpec.date = new Date().toLocaleDateString("vi-VN");
           }
           try {
-            fileToUpload = await composeFrame(shot.file, frameSpec);
+            fileToUpload = await composeFrame(fileToUpload, frameSpec);
           } catch (err) {
             console.warn("[camera-screen] composeFrame failed:", err);
             SonnerWarning("Không áp được khung, gửi ảnh gốc.");
-            // fileToUpload remains shot.file — graceful fallback
+            // fileToUpload falls back to croppedPhoto or shot.file
+            fileToUpload = croppedPhoto || shot.file;
           }
         }
 
