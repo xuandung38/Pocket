@@ -157,13 +157,12 @@ export const useMomentsStoreV2 = create((set, get) => ({
     }),
 }));
 
-/**
- * Convenience selector — returns the moments map as a sorted array
- * (newest first by `createTime`, falling back to `date`).
- *
- * Use inside React components like:
- *   const list = useMomentsStoreV2(selectMomentsArray);
- */
+// Sort helper — for use with useMemo, NOT directly as a Zustand selector.
+// Passing this directly to useMomentsStoreV2() creates a new array on every
+// call, breaking Object.is equality and causing an infinite render loop.
+// Correct pattern in components:
+//   const map = useMomentsStoreV2((s) => s.moments);
+//   const list = useMemo(() => selectMomentsArray({ moments: map }), [map]);
 export const selectMomentsArray = (state) =>
   Object.values(state.moments).sort(
     (a, b) => (b.createTime ?? b.date ?? 0) - (a.createTime ?? a.date ?? 0),
