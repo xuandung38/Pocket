@@ -16,7 +16,6 @@ import {
   useAuthStore,
   useFriendStoreV2,
   useMomentsStoreV2,
-  selectMomentsArray,
 } from "@/stores";
 import { sendReactMoment } from "@/services/moment-services";
 import { SonnerError } from "../components/ui/sonner-toast";
@@ -430,7 +429,17 @@ export default function FeedScreen() {
   const loading = useMomentsStoreV2((s) => s.loading);
   const isLoadingMore = useMomentsStoreV2((s) => s.isLoadingMore);
   const hasMore = useMomentsStoreV2((s) => s.hasMore);
-  const allMoments = useMomentsStoreV2(selectMomentsArray);
+  // Subscribe to the map (stable reference); derive sorted array via useMemo.
+  // Do NOT pass selectMomentsArray directly to useMomentsStoreV2 — it creates
+  // a new array each call which triggers an Object.is mismatch → infinite loop.
+  const momentsMap = useMomentsStoreV2((s) => s.moments);
+  const allMoments = useMemo(
+    () =>
+      Object.values(momentsMap).sort(
+        (a, b) => (b.createTime ?? b.date ?? 0) - (a.createTime ?? a.date ?? 0),
+      ),
+    [momentsMap],
+  );
 
   // ---- Local UI state ----------------------------------------------------
   const [audience, setAudience] = useState("all");

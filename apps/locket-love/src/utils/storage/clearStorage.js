@@ -10,6 +10,8 @@ export const clearLocalData = () => {
     localStorage.removeItem("friendsList");
     localStorage.removeItem("friendDetails");
     localStorage.removeItem("userPlan");
+    // Clear per-session frame cache so it doesn't leak across user accounts.
+    try { sessionStorage.removeItem("frameLibrary"); } catch { /* noop */ }
   } catch (e) {
     // Storage can throw in private-mode Safari; swallow but log so we notice.
     console.error("Failed to clear local data:", e);
