@@ -76,9 +76,17 @@ self-hosted/
 
 Project self-hosted dùng `docker-compose.yml` để chạy 3 service:
 
-- `api` (port `5001`)
-- `storage` (port `5003`)
-- `web` (port `5173`)
+- `api` — backend REST + Socket.io (port `5001`)
+- `storage` — service media → Cloudflare R2 (port `5003`)
+- `locket-love` — PWA frontend (port `8176`, build từ `../locket-love`)
+
+> Chỉ giữ `locket-love` làm frontend duy nhất — đây là codebase mới nhất theo
+> commit (thay cho 2 app cũ `web` và `lovekit`). Cổng host `8176` dùng dải `8xxx`
+> để không đụng cổng mặc định của Vite dev — chạy `npm run dev` và `docker
+> compose` song song được.
+
+> `locket-love` chờ `api` báo healthy mới khởi động
+> (qua `depends_on: condition: service_healthy`).
 
 ### 1. Chuẩn bị môi trường
 
@@ -101,21 +109,25 @@ Hiện tại project có sẵn `.env.example` cho từng service. Tạo file pro
 # macOS / Linux
 cp api/.env.example api/.env.production
 cp storage/.env.example storage/.env.production
-cp web/.env.example web/.env.production
+cp ../locket-love/.env.example ../locket-love/.env.production
 ```
 
 ```powershell
 # Windows PowerShell
 Copy-Item api/.env.example api/.env.production
 Copy-Item storage/.env.example storage/.env.production
-Copy-Item web/.env.example web/.env.production
+Copy-Item ../locket-love/.env.example ../locket-love/.env.production
 ```
+
+> Các `env_file` đều đặt `required: false` nên `docker compose build` vẫn chạy
+> khi thiếu `.env.production`. Lưu ý: biến `VITE_*` của frontend được "bake" lúc
+> **build**, nên đổi origin API phải rebuild (`--build`), không chỉ restart.
 
 Sau đó chỉnh các biến quan trọng trong từng file:
 
 - `api/.env.production`: các biến Firebase/API
 - `storage/.env.production`: R2 credentials, bucket, endpoint, `MEDIA_API_URL`
-- `web/.env.production`: các biến `VITE_*` trỏ đúng domain/port backend
+- `../locket-love/.env.production`: các biến `VITE_*` trỏ đúng domain/port backend
 
 ### 3. Build và chạy toàn bộ stack
 
@@ -140,12 +152,12 @@ Xem log riêng từng service:
 ```bash
 docker compose logs -f api
 docker compose logs -f storage
-docker compose logs -f web
+docker compose logs -f locket-love
 ```
 
 ### 4. Truy cập sau khi chạy
 
-- Web: `http://localhost:5173`
+- Locket Love (PWA): `http://localhost:8176`
 - API: `http://localhost:5001`
 - Storage: `http://localhost:5003`
 
@@ -162,7 +174,7 @@ Khởi động lại 1 service:
 ```bash
 docker compose restart api
 docker compose restart storage
-docker compose restart web
+docker compose restart locket-love
 ```
 
 Dừng stack (giữ volume/network):

@@ -1,3 +1,21 @@
+# Locket Dio — self-hosted stack.
+#
+# 3 services: api (backend REST + Socket.io) → no local DB, proxies Firebase;
+# storage (media service → Cloudflare R2); and locket-love (Vite-preview
+# frontend, the newest app by commit history — replaces the old web/lovekit).
+#
+# Quick start:
+#   1. Copy each service's .env.example → .env.production and fill in secrets.
+#   2. docker compose up -d --build
+#
+# All env_file entries are `required: false` so `docker compose build` / `config`
+# work even before .env.production exists (they're gitignored). Fill them in
+# before `up` or the services start with defaults only.
+#
+# Uploads are intentionally NOT persisted: the active post flow buffers media in
+# the container's /tmp, transcodes, pushes to Cloudflare R2 (the real store),
+# then deletes the temp file — nothing durable lives on the container FS.
+
 services:
   api:
     build:
@@ -5,11 +23,22 @@ services:
       dockerfile: Dockerfile
     container_name: locketdio-api
     env_file:
-      - ./api/.env.production
+      - path: ./api/.env.production
+        required: false
     environment:
       - NODE_ENV=production
     ports:
       - "5001:5001"
+    networks:
+      - locketdio
+    # node:20-slim has no curl/wget — use the bundled node runtime to probe the
+    # HTTP server. Any response (even 404) means the server is up → exit 0.
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:5001',r=>process.exit(0)).on('error',()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     restart: unless-stopped
 
   storage:
@@ -18,51 +47,32 @@ services:
       dockerfile: dockerfile
     container_name: locketdio-storage
     env_file:
-      - ./storage/.env.production
+      - path: ./storage/.env.production
+        required: false
     environment:
       - NODE_ENV=production
+      # Override the .env.production default (3005) so it matches the published port.
       - PORT=5003
     ports:
       - "5003:5003"
+    networks:
+      - locketdio
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:5003',r=>process.exit(0)).on('error',()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     restart: unless-stopped
 
-  web:
-    build:
-      context: ./web
-      dockerfile: Dockerfile
-    container_name: locketdio-web
-    env_file:
-      - ./web/.env.production
-    environment:
-      - NODE_ENV=production
-    ports:
-      - "5173:5173"
-    depends_on:
-      - api
-      - storage
-    restart: unless-stopped
-
-  lovekit:
-    build:
-      context: ./lovekit
-      dockerfile: Dockerfile
-    container_name: lovekit-pwa
-    env_file:
-      - ./lovekit/.env.production
-    environment:
-      - NODE_ENV=production
-    ports:
-      - "5175:5175"
-    depends_on:
-      - api
-    restart: unless-stopped
-
-  # locket-love sits one level up at apps/locket-love (sibling to apps/self-hosted).
-  # Host port 5176 avoids collision with lovekit on 5175; container still listens
-  # on 5175 internally (Vite preview default — see Dockerfile CMD).
-  # env_file is `required: false` so `docker compose build` works pre-deploy
-  # without a .env.production checked in (it's gitignored). Create one from
-  # apps/locket-love/.env.example before `docker compose up`.
+  # locket-love is the single frontend kept here — it's the newest codebase by
+  # commit history (supersedes the older `web` and `lovekit` apps). It lives one
+  # level up at apps/locket-love (sibling to apps/self-hosted).
+  # Container listens on 5175 internally (Vite preview default — see Dockerfile CMD);
+  # host 8176 is off Vite's dev default so a local `npm run dev` can run alongside.
+  # .env.production is gitignored and may not exist — create one from
+  # apps/locket-love/.env.example before `docker compose up` if you need to
+  # override VITE_* build defaults.
   locket-love:
     build:
       context: ../locket-love
@@ -74,7 +84,16 @@ services:
     environment:
       - NODE_ENV=production
     ports:
-      - "5176:5175"
+      - "8176:5175"
+    networks:
+      - locketdio
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     restart: unless-stopped
+
+# Dedicated bridge network so services resolve each other by name
+# (api, storage, web, …) and stay isolated from other Compose projects.
+networks:
+  locketdio:
+    driver: bridge

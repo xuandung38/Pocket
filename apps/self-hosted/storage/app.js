@@ -6,23 +6,15 @@ const { logGroupWrapper, logInfo } = require("./src/utils/logEventUtils");
 
 const app = express();
 
-// ✅ Cấu hình CORS nâng cao
-
-const allowedOrigins = [
-  /^http:\/\/localhost:\d+$/,
-  ...( process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",") : []),
-];
-
+// ✅ CORS: allow any request origin (reflects the caller's Origin). `credentials:
+// true` forbids a "*" wildcard, so cors echoes the Origin back instead — valid
+// with credentials. Matches the api service so the presignedV3 upload call works
+// from localhost, a LAN IP (phone / cross-device testing), or any host.
+// (Self-hosted on a trusted network; tighten with an allowlist if exposed publicly.)
 app.use(
   cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true); // Cho phép request từ cùng server (ex: curl)
-      if (allowedOrigins.some((pattern) => pattern instanceof RegExp ? pattern.test(origin) : pattern === origin)) {
-        return callback(null, true);
-      }
-      return callback(new Error("Not allowed by CORS"));
-    },
-    credentials: true, // Nếu bạn cần gửi cookie/authorization
+    origin: true,
+    credentials: true,
   }),
 );
 
