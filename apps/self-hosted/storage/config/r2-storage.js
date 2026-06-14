@@ -1,6 +1,7 @@
 const {
   S3Client,
   PutObjectCommand,
+  GetObjectCommand,
   DeleteObjectCommand,
   ListObjectsV2Command,
   DeleteObjectsCommand,
@@ -20,6 +21,7 @@ const s3 = new S3Client({
 module.exports = {
   s3,
   PutObjectCommand,
+  GetObjectCommand,
   DeleteObjectCommand,
   ListObjectsV2Command,
   DeleteObjectsCommand,
