@@ -4,3 +4,5 @@ export * from "./use-auth-store";
 export * from "./use-friend-store-v2";
 export * from "./use-moments-store-v2";
 export * from "./use-activity-store";
+export * from "./use-overlay-store";
+export * from "./use-frame-store";
