@@ -101,9 +101,24 @@ function setupChatNamespace(io) {
       const prev = activeLocketWs.get(socket.id);
       if (prev && prev.readyState < 2) prev.close();
 
+      // The client sends the peer's UID, but Firestore stores messages under
+      // conversations/{convId} where convId is the Locket conversation document
+      // ID (f.uid in users/{userId}/conversations), NOT the peer's UID.
+      // Look up the real conversation ID from the user's conversation list first.
+      let conversationId = peerUid;
+      try {
+        const { messages: convList } = await getAllMessages(idToken, localId);
+        const conv = convList.find(
+          (c) => c.with_user === peerUid || c.uid === peerUid,
+        );
+        if (conv?.uid) conversationId = conv.uid;
+      } catch (_) {
+        // keep peer UID fallback — may work on some deployments
+      }
+
       // 1. Firestore REST for initial history
       try {
-        const { messages } = await getMessagesWithUser(idToken, localId, messageId);
+        const { messages } = await getMessagesWithUser(idToken, localId, conversationId);
         if (messages?.length) socket.emit("new_message_with_user", messages);
       } catch (_) {
         // fallback to WS only
