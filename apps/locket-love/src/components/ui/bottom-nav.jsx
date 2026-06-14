@@ -1,8 +1,9 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useActivityStore, selectActivityUnread } from "@/stores";
 
-// 5-tab shell nav (Camera | Feed | Profile | Messages | Activity) — replaces the
-// legacy 3-tab Locket-dark layout. Tabs map to routes registered in App.jsx;
+// 4-tab bottom nav (Camera | Feed | Messages | Activity).
+// Profile is accessed via the avatar button in the camera top bar, not here.
+// Tabs map to routes registered in App.jsx;
 // active state derives from current pathname (with a small set of aliases so
 // e.g. /chats AND /messages both highlight the Messages tab).
 //
@@ -38,29 +39,6 @@ function GridIcon({ filled }) {
           <rect x="13" y="3" width="8" height="8" rx="2" stroke="currentColor" strokeWidth="2" />
           <rect x="3" y="13" width="8" height="8" rx="2" stroke="currentColor" strokeWidth="2" />
           <rect x="13" y="13" width="8" height="8" rx="2" stroke="currentColor" strokeWidth="2" />
-        </>
-      )}
-    </svg>
-  );
-}
-
-function UserIcon({ filled }) {
-  return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-      {filled ? (
-        <path
-          d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.42 0-8 2.69-8 6v2h16v-2c0-3.31-3.58-6-8-6Z"
-          fill="currentColor"
-        />
-      ) : (
-        <>
-          <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="2" />
-          <path
-            d="M4 21v-1c0-3.31 3.58-6 8-6s8 2.69 8 6v1"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
         </>
       )}
     </svg>
@@ -112,7 +90,6 @@ function HeartIcon({ filled }) {
 const tabs = [
   { key: "camera", path: "/", aliases: [], label: "Camera", Icon: HomeIcon },
   { key: "feed", path: "/feed", aliases: ["/memories"], label: "Feed", Icon: GridIcon },
-  { key: "profile", path: "/profile", aliases: [], label: "Hồ sơ", Icon: UserIcon },
   { key: "messages", path: "/chats", aliases: ["/messages"], label: "Tin nhắn", Icon: ChatIcon },
   { key: "activity", path: "/activity", aliases: [], label: "Hoạt động", Icon: HeartIcon },
 ];
