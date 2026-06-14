@@ -18,20 +18,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import {
-  BellOff,
-  ChevronDown,
-  Loader2,
-  RotateCcw,
-  Send,
-  Users,
-  X,
-} from "lucide-react";
+import { BellOff, ChevronDown, Loader2, RotateCcw, Users } from "lucide-react";
 import Avatar from "../components/ui/avatar";
 import CaptureButton from "../components/ui/capture-button";
 import BottomNav from "../components/ui/bottom-nav";
 import FriendsSheet from "../components/sheets/friends-sheet";
 import ProfileSheet from "../components/sheets/profile-sheet";
+import CapturedSendPreview from "../components/captured-send-preview";
 import {
   SonnerError,
   SonnerSuccess,
@@ -42,6 +35,7 @@ import {
   createRequestPayloadV5,
   postMoment,
 } from "@/services/payload-services";
+import { composeFrame } from "@/utils/compose-frame";
 
 // Swipe + wheel thresholds for the existing camera → feed gesture (preserved).
 const SWIPE_UP_THRESHOLD = 60;
@@ -77,10 +71,7 @@ export default function CameraScreen() {
   // -------- Capture lifecycle state --------
   const [phase, setPhase] = useState("preview"); // preview | captured | posting
   const [shot, setShot] = useState(null); // { file, url, type: "image"|"video" }
-  const [caption, setCaption] = useState("");
   const [facingMode, setFacingMode] = useState("user");
-  const [audience, setAudience] = useState("all");
-  const [recipients, setRecipients] = useState([]);
 
   // -------- Refs --------
   const videoRef = useRef(null);
@@ -333,47 +324,65 @@ export default function CameraScreen() {
       }
     }
     setShot(null);
-    setCaption("");
     setPhase("preview");
   }, [shot]);
 
-  const handlePost = useCallback(async () => {
-    if (!shot?.file) return;
-    if (audience === "selected" && recipients.length === 0) {
-      SonnerWarning("Hãy chọn ít nhất một người nhận.");
-      return;
-    }
+  const handlePost = useCallback(
+    async ({ caption = "", audience = "all", recipients = [], overlayData = {}, frame } = {}) => {
+      if (!shot?.file) return;
+      if (audience === "selected" && recipients.length === 0) {
+        SonnerWarning("Hãy chọn ít nhất một người nhận.");
+        return;
+      }
 
-    setPhase("posting");
-    try {
-      const payload = await createRequestPayloadV5({
-        mediaFile: shot.file,
-        previewType: shot.type,
-        caption,
-        overlayData: {},
-        audience,
-        recipients,
-      });
-      if (!payload) throw new Error("Không tạo được payload.");
+      setPhase("posting");
+      try {
+        // Bake the chosen frame into the photo before upload.
+        // Videos are never framed; "none" is a pass-through (no re-encode).
+        let fileToUpload = shot.file;
+        if (shot.type === "image" && frame && frame.type !== "none") {
+          const frameSpec = { ...frame };
+          // Inject the post timestamp for the polaroid date strip.
+          if (frameSpec.type === "polaroid") {
+            frameSpec.date = new Date().toLocaleDateString("vi-VN");
+          }
+          try {
+            fileToUpload = await composeFrame(shot.file, frameSpec);
+          } catch (err) {
+            console.warn("[camera-screen] composeFrame failed:", err);
+            SonnerWarning("Không áp được khung, gửi ảnh gốc.");
+            // fileToUpload remains shot.file — graceful fallback
+          }
+        }
 
-      const result = await postMoment(payload);
+        const payload = await createRequestPayloadV5({
+          mediaFile: fileToUpload,
+          previewType: shot.type,
+          caption,
+          overlayData,
+          audience,
+          recipients,
+        });
+        if (!payload) throw new Error("Không tạo được payload.");
 
-      // Optimistic feed insert — keep the user's just-sent moment visible
-      // immediately. BE will overwrite this entry by id on the next fetch.
-      const moment = result?.data || result;
-      if (moment?.id) addMoment(moment);
+        const result = await postMoment(payload);
 
-      SonnerSuccess("Đã gửi", "Khoảnh khắc đang lên Feed…");
-      resetToPreview();
-    } catch (err) {
-      const msg =
-        err?.response?.data?.message ||
-        err?.message ||
-        "Không gửi được bài đăng.";
-      SonnerError("Đăng tải thất bại", msg);
-      setPhase("captured");
-    }
-  }, [shot, caption, audience, recipients, addMoment, resetToPreview]);
+        const moment = result?.data || result;
+        if (moment?.id) addMoment(moment);
+
+        SonnerSuccess("Đã gửi", "Khoảnh khắc đang lên Feed…");
+        resetToPreview();
+      } catch (err) {
+        const msg =
+          err?.response?.data?.message ||
+          err?.message ||
+          "Không gửi được bài đăng.";
+        SonnerError("Đăng tải thất bại", msg);
+        setPhase("captured");
+      }
+    },
+    [shot, addMoment, resetToPreview],
+  );
 
   // ------------------------------------------------------------------
   // Camera → feed gestures (preserved from the original demo screen)
@@ -400,12 +409,7 @@ export default function CameraScreen() {
   // ------------------------------------------------------------------
   // Derived state for the audience pill copy.
   // ------------------------------------------------------------------
-  const audienceLabel =
-    audience === "all"
-      ? `${friends.length} người bạn`
-      : recipients.length === 1
-        ? "1 người"
-        : `${recipients.length} người`;
+  const audienceLabel = `${friends.length} người bạn`;
 
   const meName = user?.displayName || user?.firstName || "Bạn";
   const meAvatar = user?.profilePic || user?.photoURL || user?.picture || null;
@@ -426,224 +430,135 @@ export default function CameraScreen() {
         touchAction: "pan-x",
       }}
     >
-      {/* Top bar — keeps the original Locket Dark design (safe-area inset). */}
-      <div
-        style={{
-          flexShrink: 0,
-          height: 60,
-          marginTop: 40,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          paddingLeft: 16,
-          paddingRight: 16,
-          zIndex: 10,
-        }}
-      >
-        <button className="icon-btn" aria-label="Thông báo">
-          <BellOff size={22} />
-        </button>
-        <button className="pill-btn" onClick={() => setFriendsOpen(true)}>
-          <Users size={16} />
-          <span>{audienceLabel}</span>
-        </button>
-        <button
-          onClick={() => setProfileOpen(true)}
-          aria-label="Hồ sơ"
-          style={{
-            background: "none",
-            border: "none",
-            padding: 0,
-            cursor: "pointer",
-            borderRadius: "50%",
-          }}
-        >
-          <Avatar src={meAvatar} name={meName} size={38} />
-        </button>
-      </div>
+      {/* Captured / posting phases — full-screen send-preview overlay */}
+      {phase !== "preview" && shot && (
+        <CapturedSendPreview
+          shot={shot}
+          friends={friends}
+          isPosting={phase === "posting"}
+          onPost={handlePost}
+          onCancel={resetToPreview}
+        />
+      )}
 
-      {/* Viewfinder — square 1:1 (outer ring + inner content). */}
-      <div style={{ flexShrink: 0, padding: "0 12px" }}>
-        <div
-          style={{
-            borderRadius: "calc(var(--radius-card) + 3px)",
-            padding: 2,
-            background:
-              "linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.06) 100%)",
-          }}
-        >
+      {/* Preview phase — live camera viewfinder + controls */}
+      {phase === "preview" && (
+        <>
+          {/* Top bar */}
           <div
             style={{
-              position: "relative",
-              paddingBottom: "100%",
-              borderRadius: "var(--radius-card)",
-              overflow: "hidden",
-              background: "#111",
+              flexShrink: 0,
+              height: 60,
+              marginTop: 40,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingLeft: 16,
+              paddingRight: 16,
+              zIndex: 10,
             }}
           >
-            <div style={{ position: "absolute", inset: 0 }}>
-              {phase === "preview" && (
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  muted
-                  playsInline
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    display: "block",
-                    transform: facingMode === "user" ? "scaleX(-1)" : "none",
-                  }}
-                />
-              )}
+            <button className="icon-btn" aria-label="Thông báo">
+              <BellOff size={22} />
+            </button>
+            <button className="pill-btn" onClick={() => setFriendsOpen(true)}>
+              <Users size={16} />
+              <span>{audienceLabel}</span>
+            </button>
+            <button
+              onClick={() => setProfileOpen(true)}
+              aria-label="Hồ sơ"
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                borderRadius: "50%",
+              }}
+            >
+              <Avatar src={meAvatar} name={meName} size={38} />
+            </button>
+          </div>
 
-              {phase !== "preview" && shot && (
-                <>
-                  {shot.type === "image" ? (
-                    <img
-                      src={shot.url}
-                      alt="captured"
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                        display: "block",
-                      }}
-                    />
-                  ) : (
-                    <video
-                      src={shot.url}
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                        display: "block",
-                      }}
-                    />
-                  )}
-                  {phase === "captured" && (
-                    <button
-                      onClick={resetToPreview}
-                      aria-label="Hủy"
-                      style={{
-                        position: "absolute",
-                        top: 12,
-                        right: 12,
-                        width: 36,
-                        height: 36,
-                        borderRadius: "50%",
-                        background: "rgba(0,0,0,0.55)",
-                        backdropFilter: "blur(6px)",
-                        border: "none",
-                        color: "#fff",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <X size={16} />
-                    </button>
-                  )}
-                  {phase === "posting" && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        inset: 0,
-                        background: "rgba(0,0,0,0.55)",
-                        backdropFilter: "blur(4px)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "#fff",
-                      }}
-                    >
-                      <Loader2
-                        size={28}
-                        style={{ animation: "spin 1s linear infinite" }}
-                      />
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* Flash badge (purely decorative — kept from the demo). */}
+          {/* Viewfinder — square 1:1 */}
+          <div style={{ flexShrink: 0, padding: "0 12px" }}>
+            <div
+              style={{
+                borderRadius: "calc(var(--radius-card) + 3px)",
+                padding: 2,
+                background:
+                  "linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.06) 100%)",
+              }}
+            >
               <div
                 style={{
-                  position: "absolute",
-                  top: 12,
-                  right: phase === "captured" ? 56 : 12,
-                  width: 28,
-                  height: 28,
-                  borderRadius: "50%",
-                  background: "rgba(0,0,0,0.45)",
-                  backdropFilter: "blur(6px)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 14,
-                  color: "#fff",
-                  pointerEvents: "none",
+                  position: "relative",
+                  paddingBottom: "100%",
+                  borderRadius: "var(--radius-card)",
+                  overflow: "hidden",
+                  background: "#111",
                 }}
               >
-                ⚡
+                <div style={{ position: "absolute", inset: 0 }}>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      display: "block",
+                      transform: facingMode === "user" ? "scaleX(-1)" : "none",
+                    }}
+                  />
+                  {/* Flash badge (decorative) */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 12,
+                      right: 12,
+                      width: 28,
+                      height: 28,
+                      borderRadius: "50%",
+                      background: "rgba(0,0,0,0.45)",
+                      backdropFilter: "blur(6px)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 14,
+                      color: "#fff",
+                      pointerEvents: "none",
+                    }}
+                  >
+                    ⚡
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Caption input — visible only when reviewing a captured shot. */}
-      {phase === "captured" && (
-        <div style={{ padding: "12px 24px 0" }}>
-          <input
-            type="text"
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            placeholder="Thêm một tin nhắn"
-            maxLength={120}
+          {/* Bottom controls */}
+          <div
             style={{
-              width: "100%",
-              padding: "10px 16px",
-              borderRadius: 20,
-              background: "rgba(255,255,255,0.08)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              color: "#fff",
-              fontSize: 14,
-              outline: "none",
-              textAlign: "center",
+              flexShrink: 0,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              paddingTop: 10,
+              gap: 10,
             }}
-          />
-        </div>
-      )}
-
-      {/* Bottom action zone — different controls per phase. */}
-      <div
-        style={{
-          flexShrink: 0,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          paddingTop: 10,
-          gap: 10,
-        }}
-      >
-        <div
-          style={{
-            width: "100%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-around",
-            padding: "6px 24px",
-          }}
-        >
-          {phase === "preview" && (
-            <>
+          >
+            <div
+              style={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-around",
+                padding: "6px 24px",
+              }}
+            >
               <button
                 onClick={openGallery}
                 aria-label="Mở thư viện"
@@ -663,8 +578,7 @@ export default function CameraScreen() {
               >
                 <span style={{ fontSize: 20 }}>🖼️</span>
               </button>
-              {/* Press = photo, hold = video. Pointer events let us cover
-                  touch + mouse from one handler set. */}
+              {/* Press = photo, hold = video */}
               <div
                 onPointerDown={handleCaptureDown}
                 onPointerUp={handleCaptureUp}
@@ -692,115 +606,32 @@ export default function CameraScreen() {
               >
                 <RotateCcw size={28} />
               </button>
-            </>
-          )}
+            </div>
 
-          {phase === "captured" && (
-            <>
-              <button
-                onClick={resetToPreview}
-                aria-label="Chụp lại"
-                style={{
-                  width: 52,
-                  height: 52,
-                  borderRadius: "50%",
-                  background: "rgba(255,255,255,0.1)",
-                  border: "none",
-                  color: "#fff",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <RotateCcw size={22} />
-              </button>
-              <button
-                onClick={handlePost}
-                aria-label="Gửi"
-                style={{
-                  width: 62,
-                  height: 62,
-                  borderRadius: "50%",
-                  background: "var(--accent-yellow, #F5A623)",
-                  border: "none",
-                  color: "#000",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: "0 6px 18px rgba(245,166,35,0.4)",
-                }}
-              >
-                <Send size={22} />
-              </button>
-              <button
-                onClick={() => setFriendsOpen(true)}
-                aria-label="Người nhận"
-                style={{
-                  width: 52,
-                  height: 52,
-                  borderRadius: "50%",
-                  background: "rgba(255,255,255,0.1)",
-                  border: "none",
-                  color: "#fff",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Users size={20} />
-              </button>
-            </>
-          )}
-
-          {phase === "posting" && (
-            <div
+            {/* History label — tap or swipe-up to navigate to feed */}
+            <button
+              onClick={() => navigate("/feed")}
               style={{
-                flex: 1,
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "center",
-                gap: 8,
-                color: "var(--text-secondary)",
+                gap: 4,
                 fontSize: 13,
-                fontWeight: 500,
+                color: "var(--text-secondary)",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: "4px 0",
               }}
             >
-              <Loader2
-                size={18}
-                style={{ animation: "spin 1s linear infinite" }}
-              />
-              Đang gửi…
-            </div>
-          )}
-        </div>
+              <span>📅</span>
+              <span>Lịch sử</span>
+              <ChevronDown size={14} />
+            </button>
+          </div>
 
-        {/* Zone 3 — history label (tap → feed; swipe-up gesture also navigates). */}
-        {phase === "preview" && (
-          <button
-            onClick={() => navigate("/feed")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-              fontSize: 13,
-              color: "var(--text-secondary)",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              padding: "4px 0",
-            }}
-          >
-            <span>📅</span>
-            <span>Lịch sử</span>
-            <ChevronDown size={14} />
-          </button>
-        )}
-      </div>
-
-      <BottomNav />
+          <BottomNav />
+        </>
+      )}
 
       <input
         ref={fileInputRef}
