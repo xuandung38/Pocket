@@ -257,6 +257,36 @@ exports.imagePostPayloadSpecial = ({ imageUrl, optionsData }) => {
   return { data };
 };
 
+// Poll overlay: two-emoji question posted on a moment.
+// Stores left_emoji + right_emoji in data.payload so the read path can surface them.
+exports.imagePostPayloadPoll = ({ imageUrl, optionsData }) => {
+  const { caption, text_color, background, payload } = optionsData;
+  const data = createBaseImagePayload({ imageUrl, optionsData });
+
+  const left_emoji = payload?.left_emoji || "👍";
+  const right_emoji = payload?.right_emoji || "👎";
+  const altText = caption || "";
+
+  data.overlays.push({
+    data: {
+      text: altText,
+      text_color: text_color || "#FFFFFF",
+      type: "poll",
+      max_lines: 4,
+      background: {
+        material_blur: "ultra_thin",
+        colors: background?.colors?.length ? background.colors : [],
+      },
+      payload: { left_emoji, right_emoji },
+    },
+    alt_text: altText,
+    overlay_id: "caption:poll",
+    overlay_type: "caption",
+  });
+
+  return { data };
+};
+
 exports.imagePostPayloadBackground = ({ imageUrl, optionsData }) => {
   const { caption, text_color, color_top, color_bottom } = optionsData;
   const data = createBaseImagePayload({ imageUrl, optionsData });

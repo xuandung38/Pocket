@@ -260,6 +260,35 @@ exports.videoPostPayloadSpecial = ({ videoUrl, thumbnailUrl, optionsData }) => {
   return { data };
 };
 
+// Poll overlay for video moments: mirrors imagePostPayloadPoll.
+exports.videoPostPayloadPoll = ({ videoUrl, thumbnailUrl, optionsData }) => {
+  const { caption, text_color, background, payload } = optionsData;
+  const data = createBaseVideoPayload({ videoUrl, thumbnailUrl, optionsData });
+
+  const left_emoji = payload?.left_emoji || "👍";
+  const right_emoji = payload?.right_emoji || "👎";
+  const altText = caption || "";
+
+  data.overlays.push({
+    data: {
+      text: altText,
+      text_color: text_color || "#FFFFFF",
+      type: "poll",
+      max_lines: 4,
+      background: {
+        material_blur: "ultra_thin",
+        colors: background?.colors?.length ? background.colors : [],
+      },
+      payload: { left_emoji, right_emoji },
+    },
+    alt_text: altText,
+    overlay_id: "caption:poll",
+    overlay_type: "caption",
+  });
+
+  return { data };
+};
+
 exports.videoPostPayloadBackground = ({ videoUrl, thumbnailUrl, optionsData }) => {
   const { caption, text_color, color_top, color_bottom } = optionsData;
   const data = createBaseVideoPayload({ videoUrl, thumbnailUrl, optionsData });

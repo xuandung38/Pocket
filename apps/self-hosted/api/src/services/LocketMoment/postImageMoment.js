@@ -47,6 +47,10 @@ const postImageToLocket = async ({ userId, idToken, image, optionsData }) => {
         });
         break;
 
+      case "poll":
+        postData = creImagePayload.imagePostPayloadPoll({ imageUrl, optionsData });
+        break;
+
       default:
         postData = creImagePayload.imagePostPayloadDecorative({
           imageUrl,
@@ -140,6 +144,10 @@ const postImageToLocketV2 = async ({
         postData = creImagePayload.imagePostPayloadBackground({ imageUrl, optionsData });
         break;
 
+      case "poll":
+        postData = creImagePayload.imagePostPayloadPoll({ imageUrl, optionsData });
+        break;
+
       // custom của Dio
       case "image_icon":
       case "image_gif":
@@ -208,6 +216,9 @@ const postImageToLocketDirect = async ({ idToken, imageUrl, optionsData }) => {
         break;
       case "background":
         postData = creImagePayload.imagePostPayloadBackground({ imageUrl, optionsData });
+        break;
+      case "poll":
+        postData = creImagePayload.imagePostPayloadPoll({ imageUrl, optionsData });
         break;
       case "image_icon":
       case "image_gif":

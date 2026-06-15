@@ -72,6 +72,10 @@ const postVideoToLocket = async ({ userId, idToken, video, optionsData }) => {
         postData = creVideoPayload.videoPostPayloadBackground({ videoUrl, thumbnailUrl, optionsData });
         break;
 
+      case "poll":
+        postData = creVideoPayload.videoPostPayloadPoll({ videoUrl, thumbnailUrl, optionsData });
+        break;
+
       case "image_icon":
       case "image_gif":
       case "caption_icon":
@@ -175,6 +179,10 @@ const postVideoToLocketV2 = async ({
         break;
       case "background":
         postData = creVideoPayload.videoPostPayloadBackground({ videoUrl, thumbnailUrl, optionsData });
+        break;
+
+      case "poll":
+        postData = creVideoPayload.videoPostPayloadPoll({ videoUrl, thumbnailUrl, optionsData });
         break;
 
       case "image_icon":
