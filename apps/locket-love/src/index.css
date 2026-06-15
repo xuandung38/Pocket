@@ -277,3 +277,13 @@ button:active, a:active {
   white-space: nowrap;
   animation: marquee-continuous 9s linear infinite;
 }
+
+/* Reaction burst — emoji float upward and fade out. Used by GlobalReactionEffect
+   (inline style on each particle) as a CSS-only fallback for environments where
+   rAF is throttled. The JS rAF loop drives positions directly, making this
+   a secondary safety net. */
+@keyframes reaction-float {
+  0%   { transform: translateY(0)   scale(1);   opacity: 1; }
+  70%  { transform: translateY(-60%) scale(1.1); opacity: 0.9; }
+  100% { transform: translateY(-120%) scale(0.8); opacity: 0; }
+}

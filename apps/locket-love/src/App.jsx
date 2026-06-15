@@ -4,6 +4,7 @@ import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/stores";
 import { AppProvider } from "@/context/AppContext";
 import OptionMoment from "@/components/option-moment";
+import GlobalReactionEffect from "@/components/ui/global-reaction-effect";
 
 const CameraScreen = lazy(() => import("./screens/camera-screen"));
 const FeedScreen = lazy(() => import("./screens/feed-screen"));
@@ -96,6 +97,10 @@ export default function App() {
         {/* Global overlay — controlled by AppContext modals.optionMoment.
             Mounted once so any screen can trigger the sheet without remount. */}
         <OptionMoment />
+        {/* Reaction burst — subscribes to useReactionStore; pointer-events:none
+            so it never blocks taps. Mounted inside AppProvider for consistency
+            though zustand store is global regardless of tree position. */}
+        <GlobalReactionEffect />
       </div>
     </AppProvider>
   );

@@ -8,3 +8,4 @@ export * from "./use-activity-store";
 export * from "./use-overlay-store";
 export * from "./use-frame-store";
 export * from "./use-chat-store";
+export * from "./use-reaction-store";
