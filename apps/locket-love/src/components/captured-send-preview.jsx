@@ -12,7 +12,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Download, X, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import Avatar from "./ui/avatar";
-import FramePicker from "./frame-picker";
 import PhotoCropper from "./photo-cropper";
 import CaptionOverlay from "./caption-overlay/caption-overlay";
 import CaptionPickerSheet from "./caption-picker/caption-picker-sheet";
@@ -244,7 +243,7 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
             background: "#111", touchAction: "pan-y", userSelect: "none",
             // Isolate the stacking context so the frame overlay's high z-index
             // stays contained inside this square — otherwise it paints OVER the
-            // frame-picker BottomSheet (z-40) when the sheet slides up.
+            // caption-picker BottomSheet (z-40) when the sheet slides up.
             isolation: "isolate",
           }}
         >
@@ -470,23 +469,8 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
               : <PaperPlaneIcon />}
           </button>
 
-          {/* Frame picker button — highlighted when a frame is active */}
-          <button
-            onClick={() => !isPosting && setActiveSheet("frame")}
-            disabled={isPosting}
-            aria-label="Khung ảnh"
-            style={{
-              width: 44, height: 44, borderRadius: "50%",
-              background: selectedFrame ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.12)",
-              border: selectedFrame ? "1.5px solid rgba(255,255,255,0.45)" : "none",
-              cursor: isPosting ? "not-allowed" : "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 18, opacity: isPosting ? 0.5 : 1,
-            }}
-          >
-            🖼️
-          </button>
-
+          {/* Caption / frame picker — frames now live inside this sheet (VIP
+              section), so the standalone 🖼️ button was removed. */}
           <button
             onClick={() => !isPosting && setActiveSheet("caption")}
             disabled={isPosting}
@@ -577,6 +561,8 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
         captionOverlays={captionOverlays}
         selectedId={selectedOverlay?.overlay_id ?? null}
         onSelect={handleSelectOverlay}
+        selectedFrameId={selectedFrame?.id ?? null}
+        onSelectFrame={setSelectedFrame}
         footer={
           <button
             className="pill-btn"
@@ -598,13 +584,6 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
         }}
       />
 
-      {/* Frame Picker Sheet — manages its own BottomSheet + store interaction */}
-      <FramePicker
-        open={activeSheet === "frame"}
-        onClose={() => setActiveSheet(null)}
-        selectedFrameId={selectedFrame?.id ?? null}
-        onSelect={setSelectedFrame}
-      />
     </div>
   );
 }

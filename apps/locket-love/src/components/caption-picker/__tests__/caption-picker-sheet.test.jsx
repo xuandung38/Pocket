@@ -14,7 +14,7 @@ const overlaysWith = (extra) => ({
 });
 
 describe("<CaptionPickerSheet>", () => {
-  it("renders a Themes section and forwards a flat overlay object on pick", () => {
+  it("renders the General section and forwards a flat overlay object on pick", () => {
     const onSelect = vi.fn();
     render(
       <CaptionPickerSheet
@@ -27,7 +27,7 @@ describe("<CaptionPickerSheet>", () => {
       />,
     );
 
-    expect(screen.getByText("Themes")).toBeInTheDocument();
+    expect(screen.getByText("General")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Vui"));
     expect(onSelect).toHaveBeenCalledTimes(1);
     const arg = onSelect.mock.calls[0][0];
@@ -38,9 +38,8 @@ describe("<CaptionPickerSheet>", () => {
     render(
       <CaptionPickerSheet open onClose={() => {}} captionOverlays={overlaysWith({})} onSelect={() => {}} />,
     );
-    expect(screen.queryByText("Themes")).not.toBeInTheDocument();
-    expect(screen.queryByText("Icon")).not.toBeInTheDocument();
-    expect(screen.queryByText("GIF")).not.toBeInTheDocument();
+    expect(screen.queryByText("General")).not.toBeInTheDocument();
+    expect(screen.queryByText("Decorative")).not.toBeInTheDocument();
   });
 
   it("renders a snow preview node for a special preset", () => {
@@ -54,7 +53,7 @@ describe("<CaptionPickerSheet>", () => {
         onSelect={() => {}}
       />,
     );
-    expect(screen.getByText("Đặc biệt")).toBeInTheDocument();
+    expect(screen.getByText("Decorative")).toBeInTheDocument();
     expect(screen.getByTestId("snow")).toBeInTheDocument();
   });
 });
