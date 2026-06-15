@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import tailwindcss from "@tailwindcss/vite";
@@ -5,6 +6,15 @@ import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Vitest config lives here so tests reuse the same `@` alias + React plugin.
+  // `css: false` skips Tailwind processing in jsdom (renderers use inline styles).
+  test: {
+    environment: "jsdom",
+    globals: true,
+    setupFiles: ["./src/test/setup.js"],
+    css: false,
+    include: ["src/**/*.{test,spec}.{js,jsx}"],
+  },
   server: {
     port: Number(process.env.PORT) || 5175,
     strictPort: false,

@@ -12,12 +12,14 @@ import BottomSheet from "../components/sheets/bottom-sheet";
 import ProfileSheet from "../components/sheets/profile-sheet";
 import FriendMomentRow from "../components/friend-moment-row";
 import EmojiStudio from "../components/emoji-studio";
+import CaptionOverlay from "../components/caption-overlay/caption-overlay";
 import {
   useAuthStore,
   useFriendStoreV2,
   useMomentsStoreV2,
 } from "@/stores";
 import { sendReactMoment } from "@/services/moment-services";
+import { normalizeOverlay } from "@/utils/caption-overlay-schema";
 import { SonnerError } from "../components/ui/sonner-toast";
 
 // -------------------------------------------------------------------------
@@ -28,6 +30,27 @@ const getMomentImage = (m) =>
   m?.thumbnailUrl || m?.thumbnail_url || m?.image_url || m?.image || null;
 const getMomentVideo = (m) => m?.videoUrl || m?.video_url || null;
 const getMomentCaption = (m) => m?.caption || "";
+
+// Overlay metadata is surfaced by the API's normalizeMoment as `moment.overlays`
+// (id/type/textColor/background.colors/icon/payload); the moment's free text
+// stays on moment.caption. Plain-caption moments carry an all-null overlays
+// object → return null so the feed falls back to the flat caption bar.
+const getMomentOverlay = (m) => {
+  const ov = m?.overlays;
+  if (!ov) return null;
+  // Icon may be a { type, data } map or a raw string — unwrap before truthiness
+  // so an empty icon map ({type:"emoji", data:""}) doesn't count as an overlay
+  // and render an empty pill where a plain caption should show nothing.
+  const iconVal = ov.icon && typeof ov.icon === "object" ? ov.icon.data : ov.icon;
+  const hasOverlay =
+    !!ov.type ||
+    (Array.isArray(ov.background?.colors) && ov.background.colors.length > 0) ||
+    !!iconVal;
+  if (!hasOverlay) return null;
+  // Prefer the moment's caption, falling back to the overlay's own text (widget
+  // value like an address or "77%") so a blank moment caption doesn't hide it.
+  return normalizeOverlay({ ...ov, caption: m.caption || ov.text || "" });
+};
 const getMomentTimestampMs = (m) => {
   // Try numeric epoch (createTime) first, then ISO string, fallback 0.
   const numeric = Number(m?.createTime ?? m?.create_time);
@@ -237,6 +260,7 @@ function MomentCard({
   const image = getMomentImage(moment);
   const video = getMomentVideo(moment);
   const caption = getMomentCaption(moment);
+  const momentOverlay = getMomentOverlay(moment);
   const ts = getMomentTimestampMs(moment);
   const timeAgo = formatTimeAgo(ts);
   const quickReactions = Array.isArray(moment.reactions) && moment.reactions.length > 0
@@ -303,27 +327,45 @@ function MomentCard({
               Không có ảnh
             </div>
           )}
-          {caption && (
+          {(momentOverlay || caption) && (
             <div
               style={{
+                // Full-width centered row so chips size to content (left:50%
+                // shrink-to-fit collapsed short captions like "76%").
                 position: "absolute",
                 bottom: 14,
-                left: "50%",
-                transform: "translateX(-50%)",
-                background: "rgba(0,0,0,0.45)",
-                backdropFilter: "blur(8px)",
-                borderRadius: 20,
-                padding: "6px 16px",
-                fontSize: 15,
-                fontWeight: 700,
-                color: "#fff",
-                whiteSpace: "nowrap",
-                maxWidth: "85%",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
+                left: 0,
+                right: 0,
+                padding: "0 16px",
+                zIndex: 1,
+                display: "flex",
+                justifyContent: "center",
               }}
             >
-              {caption}
+              {momentOverlay ? (
+                // Rich overlay (theme/gradient/image/snow) rendered client-side
+                // from the moment's metadata — caption is metadata, not baked.
+                <CaptionOverlay overlay={momentOverlay} />
+              ) : (
+                // Backward-compat: plain-caption moments keep the flat bar.
+                <div
+                  style={{
+                    background: "rgba(0,0,0,0.45)",
+                    backdropFilter: "blur(8px)",
+                    borderRadius: 20,
+                    padding: "6px 16px",
+                    fontSize: 15,
+                    fontWeight: 700,
+                    color: "#fff",
+                    whiteSpace: "nowrap",
+                    maxWidth: "100%",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {caption}
+                </div>
+              )}
             </div>
           )}
         </div>

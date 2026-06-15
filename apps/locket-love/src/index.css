@@ -144,16 +144,20 @@ body,
   opacity: 0.7;
 }
 
-/* Caption sticker chip */
+/* Caption sticker chip — Locket-style rounded rectangle (not a full pill),
+   heavy frosted blur. Per-type renderers override `background` (dark/frosted/
+   gradient); the radius + blur here apply to all of them. */
 .caption-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
-  border-radius: var(--radius-pill);
+  padding: 8px 16px;
+  border-radius: 24px;
   background: var(--bg-elevated);
-  font-size: 14px;
-  font-weight: 500;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  font-size: 15px;
+  font-weight: 600;
   color: var(--text-primary);
   cursor: pointer;
   white-space: nowrap;
@@ -253,4 +257,23 @@ body,
 /* Scale tap feedback */
 button:active, a:active {
   transform: scale(0.97);
+}
+
+/* Falling snow for the winter caption (special overlay).
+   Each flake sets per-instance --drift (horizontal) + --fall-distance vars. */
+@keyframes fall {
+  to {
+    transform: translate(var(--drift, 0px), var(--fall-distance, 220px));
+  }
+}
+
+/* Scrolling track title for the music caption overlay. */
+@keyframes marquee-continuous {
+  0%, 15% { transform: translateX(0); }
+  100% { transform: translateX(-100%); }
+}
+.caption-marquee {
+  display: inline-block;
+  white-space: nowrap;
+  animation: marquee-continuous 9s linear infinite;
 }

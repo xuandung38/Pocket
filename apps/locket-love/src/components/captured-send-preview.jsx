@@ -12,27 +12,13 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Download, X, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import Avatar from "./ui/avatar";
-import BottomSheet from "./sheets/bottom-sheet";
 import FramePicker from "./frame-picker";
 import PhotoCropper from "./photo-cropper";
-import { musicServices } from "../data/mock-data";
+import CaptionOverlay from "./caption-overlay/caption-overlay";
+import CaptionPickerSheet from "./caption-picker/caption-picker-sheet";
+import MusicLinkSheet from "./caption-picker/music-link-sheet";
 import { useOverlayStore, useFrameStore } from "@/stores";
-
-// Convert API theme object → internal { id, icon, label, bg, text } shape
-function normalizeTheme(t) {
-  const colorTop = t.color_top || t.top || "#2c2c2e";
-  const colorBot = t.color_bottom || t.color_bot || colorTop;
-  const bg = colorTop !== colorBot
-    ? `linear-gradient(to bottom, ${colorTop}, ${colorBot})`
-    : colorTop;
-  return {
-    id: t.preset_id || t.id || t.caption || String(t.order_index ?? Math.random()),
-    icon: t.icon || "",
-    label: t.caption || t.preset_caption || "",
-    bg,
-    text: t.text_color || t.color_text || "#fff",
-  };
-}
+import { normalizeOverlay, toOverlayData } from "@/utils/caption-overlay-schema";
 
 const SWIPE_THRESHOLD = 40;
 
@@ -48,9 +34,10 @@ function PaperPlaneIcon() {
 export default function CapturedSendPreview({ shot, friends = [], isPosting, onPost, onCancel }) {
   const [captionIndex, setCaptionIndex] = useState(0);
   const [customMessage, setCustomMessage] = useState("");
-  const [aaText, setAaText] = useState("");
   const [editingMessage, setEditingMessage] = useState(false);
-  const [sheetCaption, setSheetCaption] = useState(null);
+  // selectedOverlay: the canonical overlay chosen from the picker sheet (null =
+  // follow the carousel; slot 0 + null = editable plain-message slot).
+  const [selectedOverlay, setSelectedOverlay] = useState(null);
   const [activeSheet, setActiveSheet] = useState(null);
   const [selectedRecipients, setSelectedRecipients] = useState(["all"]);
   // selectedFrame: null = no frame; frame object from useFrameStore.frames otherwise.
@@ -67,11 +54,9 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
   const { fetchFrames } = useFrameStore();
   useEffect(() => { fetchFrames(); }, [fetchFrames]);
 
-  // Carousel slots: slot 0 = message bubble, slots 1..N = API themes (max 7)
+  // Carousel slots: slot 0 = message bubble, slots 1..N = raw API theme presets.
   const quickCaptions = useMemo(() => {
-    const apiSlots = [...captionOverlays.custome, ...captionOverlays.decorative]
-      .slice(0, 7)
-      .map(normalizeTheme);
+    const apiSlots = [...captionOverlays.custome, ...captionOverlays.decorative].slice(0, 7);
     return [null, ...apiSlots];
   }, [captionOverlays]);
 
@@ -83,21 +68,19 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
 
   function cycleCaption(direction) {
     setEditingMessage(false);
-    setSheetCaption(null);
+    setSelectedOverlay(null);
     setCaptionIndex(
       (prev) => (prev + direction + quickCaptions.length) % quickCaptions.length,
     );
   }
 
-  function selectFromSheet(sticker) {
-    if (sheetCaption?.id === sticker.id) {
-      setSheetCaption(null);
-      setEditingMessage(false);
-    } else {
-      setSheetCaption(sticker);
-      setEditingMessage(sticker.id === "text");
-    }
-    setActiveSheet(null);
+  // Picker pick → toggle the canonical overlay (re-picking the active one clears
+  // it back to the message slot). The picker sheet closes itself after onSelect.
+  function handleSelectOverlay(overlay) {
+    setSelectedOverlay((prev) =>
+      prev?.overlay_id === overlay.overlay_id ? null : overlay,
+    );
+    setEditingMessage(false);
   }
 
   function handlePhotoPtrDown(e) { dragStartX.current = e.clientX; }
@@ -111,12 +94,18 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
   // Derived state — declared here (above useMemo) so captionForPolaroid is
   // available inside the frameOverlayNode memo without hitting the const TDZ.
   const allSelected = selectedRecipients.includes("all");
-  const isAaCaption = sheetCaption?.id === "text";
-  const isMessageSlot = !sheetCaption && captionIndex === 0;
-  const isEditableSlot = isAaCaption || isMessageSlot;
-  const activeSticker = sheetCaption || quickCaptions[captionIndex];
-  // Caption text shown in the polaroid bottom strip preview (mirrors bake output).
-  const captionForPolaroid = isAaCaption ? aaText : customMessage;
+  const isMessageSlot = !selectedOverlay && captionIndex === 0;
+  const isEditableSlot = isMessageSlot;
+  // Canonical overlay currently shown: the picker selection wins, else the active
+  // carousel slot (raw preset) folded to canonical; null on the message slot.
+  const activeOverlay = useMemo(() => {
+    if (selectedOverlay) return selectedOverlay;
+    const slot = quickCaptions[captionIndex];
+    return slot ? normalizeOverlay(slot) : null;
+  }, [selectedOverlay, quickCaptions, captionIndex]);
+  // Caption text shown in the polaroid bottom strip preview — same caption that
+  // handleSend bakes: typed message on the message slot, else the overlay caption.
+  const captionForPolaroid = isMessageSlot ? customMessage : activeOverlay?.caption ?? "";
 
   // Build the frame overlay ReactNode for the PhotoCropper (image shots only).
   // Rendered above the Cropper canvas (pointer-events:none) so users see the
@@ -170,8 +159,9 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
   }, [selectedFrame, captionForPolaroid]);
 
   async function handleSend() {
-    const isAa = sheetCaption?.id === "text";
-    const caption = isAa ? aaText : customMessage;
+    // Message slot → plain typed caption (default overlay); otherwise the active
+    // overlay carries its own caption alongside its metadata.
+    const caption = isMessageSlot ? customMessage : activeOverlay?.caption ?? "";
     const allSelected = selectedRecipients.includes("all");
 
     // Build frameSpec to forward to camera-screen for canvas baking.
@@ -206,7 +196,10 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
       caption,
       audience: allSelected ? "all" : "selected",
       recipients: allSelected ? [] : selectedRecipients,
-      overlayData: sheetCaption && sheetCaption.id !== "text" ? { sticker: sheetCaption } : {},
+      // FIX: forward the flat overlay fields the BE actually reads (payload-
+      // services optionsData) instead of the ignored { sticker } shape. Empty on
+      // the plain-message slot.
+      overlayData: isMessageSlot ? {} : toOverlayData(activeOverlay),
       frame: frameSpec,
       croppedPhoto,
     });
@@ -365,29 +358,31 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
               <ChevronRight size={18} />
             </button>
 
-            {/* Caption overlay */}
+            {/* Caption overlay — z-index above the photo-frame layer (frame is
+                rendered at z-index 100 inside PhotoCropper) so the caption always
+                sits ON TOP of the frame, never hidden behind it. */}
             <div
               style={{
-                position: "absolute", bottom: 14, left: "50%",
-                transform: "translateX(-50%)", whiteSpace: "nowrap",
-                maxWidth: "85%", zIndex: 5,
+                // Full-width centered row (NOT left:50% shrink-to-fit, which
+                // collapsed the chip and truncated short captions like "76%").
+                position: "absolute", bottom: 14, left: 0, right: 0,
+                display: "flex", justifyContent: "center",
+                padding: "0 16px", zIndex: 110,
               }}
             >
               {isEditableSlot ? (
                 (() => {
-                  const placeholder = isAaCaption ? "Văn bản" : "Thêm một tin nhắn";
-                  const pillBg = isAaCaption ? "rgba(0,0,0,0.55)" : "rgba(0,0,0,0.45)";
-                  const pillFontSize = isAaCaption ? 18 : 14;
-                  const value = isAaCaption ? aaText : customMessage;
-                  const setValue = isAaCaption ? setAaText : setCustomMessage;
-                  const pillWeight = isAaCaption ? 700 : value ? 600 : 500;
+                  const placeholder = "Thêm một tin nhắn";
+                  const pillBg = "rgba(0,0,0,0.45)";
+                  const value = customMessage;
+                  const pillWeight = value ? 600 : 500;
                   if (editingMessage) {
                     return (
                       <input
                         autoFocus
                         type="text"
                         value={value}
-                        onChange={(e) => setValue(e.target.value)}
+                        onChange={(e) => setCustomMessage(e.target.value)}
                         onBlur={() => setEditingMessage(false)}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === "Escape") setEditingMessage(false);
@@ -396,7 +391,7 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
                         style={{
                           background: pillBg, backdropFilter: "blur(10px)",
                           borderRadius: 20, padding: "8px 18px",
-                          fontSize: pillFontSize, color: "#fff", fontWeight: pillWeight,
+                          fontSize: 14, color: "#fff", fontWeight: pillWeight,
                           border: "none", outline: "none", textAlign: "center", minWidth: 200,
                         }}
                       />
@@ -409,7 +404,7 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
                       style={{
                         background: pillBg, backdropFilter: "blur(10px)",
                         borderRadius: 20, padding: "8px 18px",
-                        fontSize: pillFontSize, fontWeight: pillWeight,
+                        fontSize: 14, fontWeight: pillWeight,
                         color: value ? "#fff" : "rgba(255,255,255,0.7)", cursor: "text",
                       }}
                     >
@@ -417,20 +412,9 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
                     </div>
                   );
                 })()
-              ) : (
-                <div
-                  className="caption-chip"
-                  style={{
-                    background: activeSticker.bg || "rgba(0,0,0,0.5)",
-                    color: activeSticker.text || "#fff",
-                    backdropFilter: "blur(10px)",
-                    fontSize: 15, fontWeight: 600, padding: "8px 18px",
-                  }}
-                >
-                  <span>{activeSticker.icon}</span>
-                  <span>{activeSticker.label}</span>
-                </div>
-              )}
+              ) : activeOverlay ? (
+                <CaptionOverlay overlay={activeOverlay} />
+              ) : null}
             </div>
           </div>
         </div>
@@ -441,7 +425,7 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
         {/* Pagination dots */}
         <div style={{ display: "flex", justifyContent: "center", gap: 5, padding: "6px 0" }}>
           {quickCaptions.map((_, i) => {
-            const active = i === captionIndex && !sheetCaption;
+            const active = i === captionIndex && !selectedOverlay;
             return (
               <div
                 key={i}
@@ -585,58 +569,15 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
         </div>
       </div>
 
-      {/* Caption Sheet */}
-      <BottomSheet open={activeSheet === "caption"} onClose={() => setActiveSheet(null)} title="Chú thích">
-        <div style={{ padding: "12px 16px 32px" }}>
-          {captionOverlays.custome.length > 0 && (
-            <>
-              <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 10 }}>General</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
-                {captionOverlays.custome.map(normalizeTheme).map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => selectFromSheet(s)}
-                    style={{
-                      display: "inline-flex", alignItems: "center", gap: 6,
-                      padding: "10px 16px", borderRadius: 999,
-                      border: `2px solid ${sheetCaption?.id === s.id ? "#fff" : "transparent"}`,
-                      background: s.bg, color: s.text, fontSize: 14, fontWeight: 600,
-                      cursor: "pointer", whiteSpace: "nowrap",
-                    }}
-                  >
-                    <span>{s.icon}</span><span>{s.label}</span>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-          {captionOverlays.decorative.length > 0 && (
-            <>
-              <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 10 }}>Decorative</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
-                {captionOverlays.decorative.map(normalizeTheme).map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => selectFromSheet(s)}
-                    style={{
-                      display: "inline-flex", alignItems: "center", gap: 6,
-                      padding: "10px 16px", borderRadius: 999,
-                      border: `2px solid ${sheetCaption?.id === s.id ? "#fff" : "transparent"}`,
-                      background: s.bg, color: s.text, fontSize: 14, fontWeight: 600,
-                      cursor: "pointer", whiteSpace: "nowrap",
-                    }}
-                  >
-                    <span>{s.icon}</span><span>{s.label}</span>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-          {captionOverlays.custome.length === 0 && captionOverlays.decorative.length === 0 && (
-            <div style={{ textAlign: "center", color: "var(--text-secondary)", padding: "24px 0", fontSize: 14 }}>
-              Chưa có chú thích nào
-            </div>
-          )}
+      {/* Caption Sheet — sectioned picker (Themes/Special/Icon/GIF; later phases
+          plug system/image/music sections + the music button footer). */}
+      <CaptionPickerSheet
+        open={activeSheet === "caption"}
+        onClose={() => setActiveSheet(null)}
+        captionOverlays={captionOverlays}
+        selectedId={selectedOverlay?.overlay_id ?? null}
+        onSelect={handleSelectOverlay}
+        footer={
           <button
             className="pill-btn"
             onClick={() => setActiveSheet("music")}
@@ -644,28 +585,18 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
           >
             🎵 Thêm nhạc
           </button>
-        </div>
-      </BottomSheet>
+        }
+      />
 
-      {/* Music Sheet */}
-      <BottomSheet open={activeSheet === "music"} onClose={() => setActiveSheet(null)} title="Chọn dịch vụ">
-        <div style={{ padding: "8px 0 32px" }}>
-          {musicServices.map((svc, idx) => (
-            <div key={svc.id}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px" }}>
-                <div style={{ width: 36, height: 36, borderRadius: "50%", background: svc.color, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
-                  {svc.id === "spotify" ? "🎵" : "🎶"}
-                </div>
-                <span style={{ flex: 1, fontSize: 15, fontWeight: 600 }}>{svc.name}</span>
-                <button className="pill-btn" style={{ fontSize: 13, padding: "6px 16px" }}>Connect</button>
-              </div>
-              {idx < musicServices.length - 1 && (
-                <div style={{ height: 1, background: "var(--border-subtle)", margin: "0 16px" }} />
-              )}
-            </div>
-          ))}
-        </div>
-      </BottomSheet>
+      {/* Music link sheet — paste a Spotify/Apple link → resolved music overlay */}
+      <MusicLinkSheet
+        open={activeSheet === "music"}
+        onClose={() => setActiveSheet(null)}
+        onSubmit={(overlay) => {
+          handleSelectOverlay(overlay);
+          setActiveSheet(null);
+        }}
+      />
 
       {/* Frame Picker Sheet — manages its own BottomSheet + store interaction */}
       <FramePicker

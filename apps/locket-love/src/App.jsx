@@ -11,7 +11,6 @@ const MemoriesScreen = lazy(() => import("./screens/memories-screen"));
 const ChatListScreen = lazy(() => import("./screens/chat-list-screen"));
 const ChatDetailScreen = lazy(() => import("./screens/chat-detail-screen"));
 const PhotoDetailScreen = lazy(() => import("./screens/photo-detail-screen"));
-const SendScreen = lazy(() => import("./screens/send-screen"));
 const LoginScreen = lazy(() => import("./screens/login-screen"));
 const MessagesScreen = lazy(() => import("./screens/messages-screen"));
 const ActivityScreen = lazy(() => import("./screens/activity-screen"));
@@ -85,7 +84,6 @@ export default function App() {
             <Route path="/chats" element={<RequireAuth><ChatListScreen /></RequireAuth>} />
             <Route path="/chats/:id" element={<RequireAuth><ChatDetailScreen /></RequireAuth>} />
             <Route path="/photo/:id" element={<RequireAuth><PhotoDetailScreen /></RequireAuth>} />
-            <Route path="/send" element={<RequireAuth><SendScreen /></RequireAuth>} />
             {/* Tab destinations added by dev-10 nav shell. Real screens land in later phases. */}
             <Route path="/messages" element={<RequireAuth><MessagesScreen /></RequireAuth>} />
             <Route path="/profile" element={<RequireAuth><ProfileScreen /></RequireAuth>} />
