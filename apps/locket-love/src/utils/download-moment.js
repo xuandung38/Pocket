@@ -3,13 +3,15 @@
 // triggers an anchor download. Returns true on success, false on failure (e.g.
 // CORS-blocked) so callers can surface an honest toast.
 //
-// R2 serves frame/moment assets with CORS headers; if a future origin lacks
-// them the fetch throws and we fall back to opening the URL in a new tab.
+// CORS-less CDN URLs (Locket/Firebase) are routed through the API proxy so the
+// fetch succeeds; if even that fails we fall back to opening the URL in a tab.
+
+import { proxyImageUrl } from "./moment-media";
 
 export async function downloadMoment(url, filename = `locket_${Date.now()}.jpg`) {
   if (!url) return false;
   try {
-    const res = await fetch(url, { mode: "cors" });
+    const res = await fetch(proxyImageUrl(url), { mode: "cors" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const blob = await res.blob();
     const objectUrl = URL.createObjectURL(blob);

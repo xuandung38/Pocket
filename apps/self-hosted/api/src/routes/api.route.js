@@ -4,6 +4,12 @@ const { getCurrentWeather } = require("../services/Weather/weather-service");
 const { getMusicInfo } = require("../services/Music/music-service");
 const { verifyIdToken } = require("../middlewares/verifyToken.js");
 const storageController = require("../controllers/storage.controller.js");
+const proxyController = require("../controllers/proxy.controller.js");
+
+// Stream a Locket/Firebase CDN image through this origin so the browser can
+// fetch its bytes (Save / Web Share) — those CDNs don't send CORS headers.
+// Public + host-allowlisted (see proxy.controller.js).
+router.get("/proxyImage", proxyController.proxyImage);
 
 router.post("/weatherV2", async (req, res, next) => {
   try {
