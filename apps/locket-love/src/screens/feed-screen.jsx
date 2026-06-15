@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
-import { Bell, Plus, ArrowUp } from "lucide-react";
+import { Bell, Plus, ArrowUp, LayoutGrid, Share2 } from "lucide-react";
 
 // At the top of the feed, an upward wheel/swipe goes back to camera (mirrors camera→feed)
 const PULL_BACK_THRESHOLD = 50;
@@ -10,6 +10,7 @@ import AudiencePicker from "../components/ui/audience-picker";
 import BottomNav from "../components/ui/bottom-nav";
 import BottomSheet from "../components/sheets/bottom-sheet";
 import ProfileSheet from "../components/sheets/profile-sheet";
+import MomentShareSheet from "../components/sheets/moment-share-sheet";
 import FriendMomentRow from "../components/friend-moment-row";
 import EmojiStudio from "../components/emoji-studio";
 import CaptionOverlay from "../components/caption-overlay/caption-overlay";
@@ -272,6 +273,7 @@ function MomentCard({
 
   return (
     <div
+      data-moment-id={moment.id}
       style={{
         scrollSnapAlign: "start",
         flexShrink: 0,
@@ -279,8 +281,10 @@ function MomentCard({
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        justifyContent: "center",
-        padding: "0 12px",
+        // Top-align so the card sits just under the friend strip instead of
+        // floating in the middle (which left a large gap below the avatars).
+        justifyContent: "flex-start",
+        padding: "8px 12px 0",
         boxSizing: "border-box",
       }}
     >
@@ -490,9 +494,17 @@ export default function FeedScreen() {
   const [emojiPickerMoment, setEmojiPickerMoment] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [toast, setToast] = useState(null);
+  // Moment currently filling the viewport (drives the Share sheet target) +
+  // the feed-only share sheet open flag.
+  const [activeMomentId, setActiveMomentId] = useState(null);
+  const [shareOpen, setShareOpen] = useState(false);
 
   // Date filter from /memories cell click — "YYYY-MM-DD" or null
   const dateFilter = searchParams.get("date");
+  // Moment to scroll to, set by a /grid cell tap ("?moment=<id>"). Without this
+  // the feed always opened at the newest moment regardless of which grid cell
+  // was tapped.
+  const focusMomentId = searchParams.get("moment");
 
   // ---- Derived data ------------------------------------------------------
   const meUid = user?.uid || user?.localId || null;
@@ -534,6 +546,54 @@ export default function FeedScreen() {
 
   // ---- Pull-back-to-camera gesture --------------------------------------
   const scrollRef = useRef(null);
+
+  // Jump to the moment named by "?moment=<id>" (a /grid cell tap). Runs once
+  // when the target card exists; snap-scroll lands it at the top.
+  const didFocusRef = useRef(false);
+  useEffect(() => {
+    if (!focusMomentId || didFocusRef.current) return;
+    if (!moments.length) return;
+    const selector = `[data-moment-id="${
+      typeof CSS !== "undefined" && CSS.escape
+        ? CSS.escape(focusMomentId)
+        : focusMomentId
+    }"]`;
+    const el = scrollRef.current?.querySelector(selector);
+    if (el) {
+      el.scrollIntoView({ block: "start" });
+      didFocusRef.current = true;
+    }
+  }, [focusMomentId, moments]);
+
+  // Track which moment fills the viewport so the Share button targets it.
+  // Re-observes whenever the moment list changes.
+  useEffect(() => {
+    const root = scrollRef.current;
+    if (!root) return undefined;
+    const cards = root.querySelectorAll("[data-moment-id]");
+    if (!cards.length) return undefined;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const top = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        const id = top?.target?.getAttribute("data-moment-id");
+        if (id) setActiveMomentId(id);
+      },
+      { root, threshold: [0.4, 0.6, 0.8] },
+    );
+    cards.forEach((c) => observer.observe(c));
+    return () => observer.disconnect();
+  }, [moments]);
+
+  // Drop a stale active id once its moment leaves the list (e.g. after delete)
+  // so the Share sheet never targets a removed moment — it falls back to newest.
+  useEffect(() => {
+    if (activeMomentId && !moments.some((m) => m.id === activeMomentId)) {
+      setActiveMomentId(null);
+    }
+  }, [moments, activeMomentId]);
+
   const dragStartY = useRef(null);
   const wheelLockedUntil = useRef(0);
 
@@ -614,6 +674,10 @@ export default function FeedScreen() {
   const authorAvatar =
     user?.profilePicture || user?.profile_picture_url || user?.avatar || null;
   const authorName = user?.displayName || user?.first_name || "Bạn";
+
+  // Moment the Share sheet acts on — the one in view, else the newest.
+  const activeMoment =
+    moments.find((m) => m.id === activeMomentId) || moments[0] || null;
 
   return (
     <div
@@ -754,7 +818,73 @@ export default function FeedScreen() {
         )}
       </div>
 
+      {/* Feed-only side buttons flanking the nav pill (Locket layout):
+          Grid (left) → gallery, Share (right) → share sheet for the active
+          moment. Hidden while the feed is empty/loading. */}
+      {moments.length > 0 && (
+        <>
+          <button
+            onClick={() => navigate("/grid")}
+            aria-label="Lưới"
+            style={{
+              position: "absolute",
+              bottom: 22,
+              left: 16,
+              width: 46,
+              height: 46,
+              borderRadius: "50%",
+              border: "1px solid rgba(255,255,255,0.08)",
+              background: "rgba(30,30,32,0.78)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+              color: "#fff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              boxShadow: "0 6px 20px rgba(0,0,0,0.45)",
+              zIndex: 30,
+            }}
+          >
+            <LayoutGrid size={22} />
+          </button>
+          <button
+            onClick={() => setShareOpen(true)}
+            aria-label="Chia sẻ"
+            style={{
+              position: "absolute",
+              bottom: 22,
+              right: 16,
+              width: 46,
+              height: 46,
+              borderRadius: "50%",
+              border: "1px solid rgba(255,255,255,0.08)",
+              background: "rgba(30,30,32,0.78)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+              color: "#fff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              boxShadow: "0 6px 20px rgba(0,0,0,0.45)",
+              zIndex: 30,
+            }}
+          >
+            <Share2 size={22} />
+          </button>
+        </>
+      )}
+
       <BottomNav />
+
+      {/* Share sheet for the active moment (feed-only) */}
+      <MomentShareSheet
+        open={shareOpen}
+        moment={activeMoment}
+        meUid={meUid}
+        onClose={() => setShareOpen(false)}
+      />
 
       {/* Reply overlay — friend's moment message bar opens this */}
       <ReplyOverlay

@@ -7,6 +7,7 @@ import OptionMoment from "@/components/option-moment";
 
 const CameraScreen = lazy(() => import("./screens/camera-screen"));
 const FeedScreen = lazy(() => import("./screens/feed-screen"));
+const GridScreen = lazy(() => import("./screens/grid-screen"));
 const MemoriesScreen = lazy(() => import("./screens/memories-screen"));
 const ChatListScreen = lazy(() => import("./screens/chat-list-screen"));
 const ChatDetailScreen = lazy(() => import("./screens/chat-detail-screen"));
@@ -80,6 +81,7 @@ export default function App() {
             <Route path="/login" element={<LoginScreen />} />
             <Route path="/" element={<RequireAuth><CameraScreen /></RequireAuth>} />
             <Route path="/feed" element={<RequireAuth><FeedScreen /></RequireAuth>} />
+            <Route path="/grid" element={<RequireAuth><GridScreen /></RequireAuth>} />
             <Route path="/memories" element={<RequireAuth><MemoriesScreen /></RequireAuth>} />
             <Route path="/chats" element={<RequireAuth><ChatListScreen /></RequireAuth>} />
             <Route path="/chats/:id" element={<RequireAuth><ChatDetailScreen /></RequireAuth>} />

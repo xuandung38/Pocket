@@ -16,9 +16,16 @@
 // MediaStream; we re-acquire it on focus so the user isn't stuck on a frozen
 // frame after switching apps/tabs.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { BellOff, ChevronDown, Loader2, RotateCcw, Users } from "lucide-react";
+import {
+  ChevronDown,
+  Image as ImageIcon,
+  Megaphone,
+  RotateCcw,
+  Users,
+  Zap,
+} from "lucide-react";
 import Avatar from "../components/ui/avatar";
 import CaptureButton from "../components/ui/capture-button";
 import BottomNav from "../components/ui/bottom-nav";
@@ -30,7 +37,14 @@ import {
   SonnerSuccess,
   SonnerWarning,
 } from "../components/ui/sonner-toast";
-import { useAuthStore, useFriendStoreV2, useMomentsStoreV2 } from "@/stores";
+import {
+  useAuthStore,
+  useFriendStoreV2,
+  useMomentsStoreV2,
+  selectMomentsArray,
+  useActivityStore,
+  selectActivityUnread,
+} from "@/stores";
 import {
   createRequestPayloadV5,
   postMoment,
@@ -73,6 +87,17 @@ export default function CameraScreen() {
   const [shot, setShot] = useState(null); // { file, url, type: "image"|"video" }
   const [facingMode, setFacingMode] = useState("user");
 
+  // -------- Flash (torch) + zoom — driven by MediaStreamTrack capabilities.
+  // Both gracefully no-op when the active track/device doesn't support them
+  // (e.g. desktop webcams, most front cameras). --------
+  const [flashOn, setFlashOn] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
+  const [zoomCaps, setZoomCaps] = useState(null); // { min, max, step } | null
+  const [zoom, setZoom] = useState(1);
+  // Last gallery-picked image — used as the gallery-button thumbnail (Locket
+  // shows the most recent photo there, not a generic icon).
+  const [galleryThumb, setGalleryThumb] = useState(null);
+
   // -------- Refs --------
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -90,6 +115,24 @@ export default function CameraScreen() {
   const friends = useFriendStoreV2((s) => s.friends);
   const loadFriends = useFriendStoreV2((s) => s.loadFriends);
   const addMoment = useMomentsStoreV2((s) => s.addMoment);
+  const momentsMap = useMomentsStoreV2((s) => s.moments);
+  const loadInitialMoments = useMomentsStoreV2((s) => s.loadInitial);
+  // Notifications now live behind the top-left megaphone (Locket layout); keep
+  // its unread badge wired to the activity store.
+  const activityUnread = useActivityStore(selectActivityUnread);
+
+  // Latest moment thumbnail drives the "Lịch sử" pill (Locket shows the most
+  // recent shot, not a calendar glyph). Image field varies by endpoint.
+  const latestThumb = useMemo(() => {
+    const latest = selectMomentsArray({ moments: momentsMap })[0];
+    return (
+      latest?.thumbnailUrl ||
+      latest?.thumbnail_url ||
+      latest?.image_url ||
+      latest?.image ||
+      null
+    );
+  }, [momentsMap]);
 
   // ------------------------------------------------------------------
   // Media stream acquisition. We re-acquire on:
@@ -130,6 +173,24 @@ export default function CameraScreen() {
           /* play() can reject when the element is detaching — safe to ignore */
         }
       }
+
+      // Probe the new track for torch + zoom support. A fresh track always
+      // starts with flash off and zoom at base, so reset the UI state too.
+      const track = stream.getVideoTracks?.()[0];
+      const caps = track?.getCapabilities?.() ?? {};
+      setTorchSupported(!!caps.torch);
+      setFlashOn(false);
+      if (caps.zoom && typeof caps.zoom.max === "number" && caps.zoom.max > (caps.zoom.min ?? 1)) {
+        setZoomCaps({
+          min: caps.zoom.min ?? 1,
+          max: caps.zoom.max,
+          step: caps.zoom.step ?? 0.1,
+        });
+        setZoom(caps.zoom.min ?? 1);
+      } else {
+        setZoomCaps(null);
+        setZoom(1);
+      }
     } catch (err) {
       console.warn("[camera-screen] getUserMedia failed:", err);
       SonnerWarning(
@@ -166,6 +227,59 @@ export default function CameraScreen() {
   useEffect(() => {
     if (!friends || friends.length === 0) loadFriends?.();
   }, [friends, loadFriends]);
+
+  // One-shot moments prefetch so the "Lịch sử" pill can show the latest shot
+  // even on a cold camera load. Read via getState() (not the subscribed map)
+  // so an empty first page can't re-trigger the effect into a loop.
+  useEffect(() => {
+    if (Object.keys(useMomentsStoreV2.getState().moments).length === 0) {
+      loadInitialMoments?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ------------------------------------------------------------------
+  // Flash (torch) + zoom controls. Both apply live constraints to the active
+  // video track; unsupported devices surface a soft warning / no-op.
+  // ------------------------------------------------------------------
+  const toggleFlash = useCallback(async () => {
+    const track = streamRef.current?.getVideoTracks?.()[0];
+    if (!track) return;
+    if (!torchSupported) {
+      SonnerWarning("Thiết bị/camera này không hỗ trợ đèn flash.");
+      return;
+    }
+    const next = !flashOn;
+    try {
+      await track.applyConstraints({ advanced: [{ torch: next }] });
+      setFlashOn(next);
+    } catch (err) {
+      console.warn("[camera-screen] torch failed:", err);
+      SonnerWarning("Không bật được đèn flash.");
+    }
+  }, [flashOn, torchSupported]);
+
+  // Preset zoom stops clamped to the device's reported range.
+  const zoomLevels = useMemo(() => {
+    if (!zoomCaps) return [];
+    return [1, 2, 3, 5].filter(
+      (z) => z >= (zoomCaps.min ?? 1) && z <= zoomCaps.max,
+    );
+  }, [zoomCaps]);
+
+  const cycleZoom = useCallback(async () => {
+    if (!zoomCaps || zoomLevels.length === 0) return;
+    const track = streamRef.current?.getVideoTracks?.()[0];
+    if (!track) return;
+    const idx = zoomLevels.indexOf(zoom);
+    const next = zoomLevels[(idx + 1) % zoomLevels.length] ?? zoomLevels[0];
+    try {
+      await track.applyConstraints({ advanced: [{ zoom: next }] });
+      setZoom(next);
+    } catch (err) {
+      console.warn("[camera-screen] zoom failed:", err);
+    }
+  }, [zoom, zoomCaps, zoomLevels]);
 
   // ------------------------------------------------------------------
   // Capture helpers
@@ -308,6 +422,7 @@ export default function CameraScreen() {
       return;
     }
     const url = URL.createObjectURL(file);
+    if (isImage) setGalleryThumb(url);
     setShot({ file, url, type: isVideo ? "video" : "image" });
     setPhase("captured");
   };
@@ -464,8 +579,42 @@ export default function CameraScreen() {
               zIndex: 10,
             }}
           >
-            <button className="icon-btn" aria-label="Thông báo">
-              <BellOff size={22} />
+            <button
+              className="icon-btn"
+              aria-label={
+                activityUnread > 0
+                  ? `Thông báo (${activityUnread} chưa đọc)`
+                  : "Thông báo"
+              }
+              onClick={() => navigate("/activity")}
+              style={{ position: "relative" }}
+            >
+              <Megaphone size={22} />
+              {activityUnread > 0 && (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: "absolute",
+                    top: -2,
+                    right: -2,
+                    minWidth: 16,
+                    height: 16,
+                    borderRadius: 999,
+                    padding: "0 4px",
+                    background: "var(--accent-color, #f5a623)",
+                    color: "#fff",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    lineHeight: "16px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: "0 0 0 2px var(--bg-primary)",
+                  }}
+                >
+                  {activityUnread > 99 ? "99+" : activityUnread}
+                </span>
+              )}
             </button>
             <button className="pill-btn" onClick={() => setFriendsOpen(true)}>
               <Users size={16} />
@@ -519,27 +668,60 @@ export default function CameraScreen() {
                       transform: facingMode === "user" ? "scaleX(-1)" : "none",
                     }}
                   />
-                  {/* Flash badge (decorative) */}
-                  <div
+                  {/* Flash toggle — top-left, like Locket. Tints yellow when on. */}
+                  <button
+                    onClick={toggleFlash}
+                    aria-label={flashOn ? "Tắt đèn flash" : "Bật đèn flash"}
+                    aria-pressed={flashOn}
                     style={{
                       position: "absolute",
                       top: 12,
-                      right: 12,
-                      width: 28,
-                      height: 28,
+                      left: 12,
+                      width: 32,
+                      height: 32,
                       borderRadius: "50%",
+                      border: "none",
                       background: "rgba(0,0,0,0.45)",
                       backdropFilter: "blur(6px)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      fontSize: 14,
-                      color: "#fff",
-                      pointerEvents: "none",
+                      cursor: "pointer",
+                      color: flashOn ? "var(--accent-yellow)" : "#fff",
                     }}
                   >
-                    ⚡
-                  </div>
+                    <Zap size={16} fill={flashOn ? "currentColor" : "none"} />
+                  </button>
+
+                  {/* Zoom selector — top-right; only shown when the track
+                      reports a usable zoom range. Tap cycles preset stops. */}
+                  {zoomCaps && zoomLevels.length > 1 && (
+                    <button
+                      onClick={cycleZoom}
+                      aria-label={`Thu phóng ${zoom}x`}
+                      style={{
+                        position: "absolute",
+                        top: 12,
+                        right: 12,
+                        minWidth: 34,
+                        height: 32,
+                        padding: "0 8px",
+                        borderRadius: 999,
+                        border: "none",
+                        background: "rgba(0,0,0,0.45)",
+                        backdropFilter: "blur(6px)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        color: "#fff",
+                        fontSize: 12,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {zoom}×
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -580,9 +762,24 @@ export default function CameraScreen() {
                   alignItems: "center",
                   justifyContent: "center",
                   flexShrink: 0,
+                  overflow: "hidden",
+                  padding: 0,
                 }}
               >
-                <span style={{ fontSize: 20 }}>🖼️</span>
+                {galleryThumb || latestThumb ? (
+                  <img
+                    src={galleryThumb || latestThumb}
+                    alt=""
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      display: "block",
+                    }}
+                  />
+                ) : (
+                  <ImageIcon size={22} />
+                )}
               </button>
               {/* Press = photo, hold = video */}
               <div
@@ -614,24 +811,49 @@ export default function CameraScreen() {
               </button>
             </div>
 
-            {/* History label — tap or swipe-up to navigate to feed */}
+            {/* History pill — dark rounded pill with the latest thumbnail,
+                like Locket. Tap or swipe-up navigates to the feed. */}
             <button
               onClick={() => navigate("/feed")}
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 4,
-                fontSize: 13,
-                color: "var(--text-secondary)",
-                background: "none",
+                gap: 7,
+                fontSize: 14,
+                fontWeight: 600,
+                color: "#fff",
+                background: "rgba(255,255,255,0.1)",
                 border: "none",
                 cursor: "pointer",
-                padding: "4px 0",
+                padding: "5px 12px 5px 5px",
+                borderRadius: 999,
               }}
             >
-              <span>📅</span>
+              {latestThumb ? (
+                <img
+                  src={latestThumb}
+                  alt=""
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 8,
+                    objectFit: "cover",
+                    display: "block",
+                  }}
+                />
+              ) : (
+                <span
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 8,
+                    background: "rgba(255,255,255,0.18)",
+                    display: "inline-block",
+                  }}
+                />
+              )}
               <span>Lịch sử</span>
-              <ChevronDown size={14} />
+              <ChevronDown size={16} style={{ opacity: 0.7 }} />
             </button>
           </div>
 
