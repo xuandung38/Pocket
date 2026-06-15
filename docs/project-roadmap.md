@@ -26,6 +26,9 @@ Living document tracking Locket Dio development phases, milestones, and feature 
 ✅ PWA installation (mobile home screen)  
 ✅ Self-hosted Docker Compose deployment  
 ✅ Vercel + Firebase cloud deployment  
+✅ Caption/overlay system (metadata-based, rendered client-side)  
+✅ Live caption data (weather, location, battery, time, music, images)  
+✅ Vitest test suite (38+ tests)  
 
 ---
 
@@ -114,9 +117,12 @@ Living document tracking Locket Dio development phases, milestones, and feature 
 - [x] Express.js API server
 - [x] Storage service for presigned URLs
 - [x] Docker Compose configuration (3 services)
+- [x] Caption/overlay system (metadata-based, client-rendered)
+- [x] Live caption data sources (weather, location, battery, time, music, image upload)
+- [x] POST /api/getInfoMusic endpoint (Spotify/Apple Music metadata)
+- [x] Vitest test suite with React Testing Library (38+ tests)
 - [ ] Fix CORS headers alignment (IN PROGRESS)
 - [ ] Fix auth route method standardization (IN PROGRESS)
-- [ ] Fix overlay type definitions (IN PROGRESS)
 - [ ] Complete .env.example for all services
 - [ ] Self-hosted deployment guide (docs/deployment-guide.md)
 
@@ -125,12 +131,15 @@ Living document tracking Locket Dio development phases, milestones, and feature 
 - [ ] Self-hosted web connects to local API
 - [ ] File upload works end-to-end in Docker
 - [ ] Real-time chat works with local Socket.io
+- [ ] Caption overlays render correctly in compose preview + feed
+- [ ] Live data (weather, location, battery, time) fetches & displays
+- [ ] Music metadata resolves from Spotify/Apple Music links
+- [ ] Vitest test suite passes (38+ tests, >80% coverage)
 - [ ] Tested on VPS environments (Ubuntu 20.04+)
 
 #### Known Issues
 - CORS headers not matching between cloud & self-hosted
 - Auth route methods (GET vs POST) inconsistent
-- Overlay state types causing type validation errors
 - Missing environment variable documentation
 
 #### Next Steps (Immediate)

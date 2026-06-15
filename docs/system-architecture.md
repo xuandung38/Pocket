@@ -146,6 +146,37 @@ Docker Compose (3 services)
 9. Dexie cache + UI update
 ```
 
+### Data Flow: Caption/Overlay Metadata
+
+```
+1. User selects caption overlay type (theme, icon, live data, music, image)
+           ↓
+2. React UI (caption-picker-sheet) → useOverlayStore.setSelectedOverlay(overlay)
+           ↓
+3. Live data collection (parallel):
+   ├─ use-weather.js → Geolocation + POST /weatherV2 → {temp, condition, icon}
+   ├─ use-location.js → Nominatim reverse geocode → {city, country}
+   ├─ use-battery.js → Battery Status API → {level, charging}
+   ├─ use-image-caption.js → R2 upload (rounded square crop) → {imageUrl}
+   └─ music-services.js → POST /getInfoMusic {spotifyUrl} → {title, artist, image}
+           ↓
+4. Compose preview renders <CaptionOverlay overlay={selectedOverlay} />
+           ↓
+5. User confirms share → handleSend(moment, selectedOverlay)
+           ↓
+6. Client calls toOverlayData(selectedOverlay) → flat optionsData fields:
+   {
+     overlayType: "weather",
+     overlayData: {temp, condition, icon, ...}
+   }
+           ↓
+7. POST /postMomentV2 {fileUrl, caption, optionsData}
+           ↓
+8. Backend createRequestPayloadV5 merges optionsData → Firestore document
+           ↓
+9. Feed read: normalizeMoment() reconstructs overlay → <CaptionOverlay>
+```
+
 ### Data Flow: Real-Time Messaging (WebSocket)
 
 ```
@@ -580,6 +611,51 @@ const ThemeSelector = () => {
   );
 };
 ```
+
+### 6. Caption/Overlay Metadata Service
+
+**Music Metadata Endpoint:**
+```
+POST /api/getInfoMusic
+Request: { spotifyUrl: "https://open.spotify.com/track/...", appleUrl?: "..." }
+Response: {
+  title: "Song Name",
+  artist: "Artist Name",
+  image: "https://image-url",
+  platform: "spotify" | "apple-music",
+  url: "original-url"
+}
+```
+
+**Implementation:**
+```javascript
+// services/Music/music-service.js
+- Spotify oEmbed: fetch `https://open.spotify.com/oembed?url={url}`
+- Apple Music: parse OG tags from URL → {title, image, artist}
+- Error handling: return null if invalid URL or network error
+- Caching: client localStorage caches {url → metadata} for 24 hours
+
+// Client hook: use-image-caption.js
+- Wraps music-services, fetches + caches result
+- Supports Spotify & Apple Music links pasted in caption picker
+```
+
+**Weather Metadata Endpoint:**
+```
+POST /api/weatherV2
+Request: { lat: number, lon: number }
+Response: {
+  temp: number,
+  condition: string (e.g., "sunny", "rainy"),
+  icon: string (emoji or icon code),
+  location: string (city name)
+}
+```
+
+**Live Data Hooks (Browser-side):**
+- `use-weather.js` — Calls Geolocation API, then POST /weatherV2
+- `use-location.js` — Nominatim reverse geocode {lat, lon} → {city, country} (debounced, cached)
+- `use-battery.js` — Battery Status API → {level, charging} (fallback if unavailable)
 
 ---
 

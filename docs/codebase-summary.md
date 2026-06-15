@@ -48,6 +48,7 @@ Monorepo containing the Locket Dio PWA and self-hosted backend services. All cod
 | `helpers/` | Helper functions | 10+ | 300+ |
 | `constants/` | Application constants | 5 | 150 |
 | `assets/` | Images, icons, fonts | — | — |
+| `test/` | Vitest test setup & config | 1 | 50+ |
 
 **Key Patterns:**
 
@@ -98,6 +99,18 @@ framer-motion@x.x
 - `LocketDioServices` — Payment, storage, extended features
 - `ExtensionsServices` — Browser extensions API
 - `BrowserServices` — Device info, storage access
+- `weather-services` — Weather API integration
+- `music-services` — Music metadata fetching (Spotify/Apple Music)
+
+**Caption/Overlay System:**
+- `utils/caption-overlay-schema.js` — Canonical overlay schema, normalization (`normalizeOverlay`), projection (`toOverlayData`)
+- `components/caption-overlay/` — Renderer dispatcher (`caption-overlay.jsx`) + per-type displays (default, gradient, image-icon, snow, time, battery, weather, location, review, heart, music)
+- `components/caption-picker/` — UI builder: sectioned bottom sheet (`caption-picker-sheet.jsx`), theme presets (`caption-pill.jsx`), live data sections (time/weather/battery/location), R2 image upload, Spotify/Apple Music link paste, review form
+- `hooks/use-weather.js` — Geolocation + Weather API client
+- `hooks/use-location.js` — Nominatim reverse geocode (debounced, cached)
+- `hooks/use-battery.js` — Battery Status API integration
+- `hooks/use-image-caption.js` — R2 upload wrapper + localStorage caching
+- `utils/crop-rounded-square.js` — Canvas center-crop + rounded corners for image overlays
 
 **Axios Instances:**
 - `instanceAuth` — Login, token refresh
@@ -177,10 +190,14 @@ User:
 Moments:
 - `POST /postMomentV1` — Upload via multipart (< 100MB)
 - `POST /postMomentV2` — Upload via presigned URL
-- `POST /getMomentV2` — Fetch moment with metadata
+- `POST /getMomentV2` — Fetch moment with metadata (with overlay support)
 
 Messages:
 - `POST /getAllMessageV2` — Fetch chat history
+
+Caption/Overlay Metadata:
+- `POST /weatherV2` — Fetch weather data (geolocation → API)
+- `POST /getInfoMusic` — Fetch music metadata from Spotify/Apple Music oEmbed (returns {title, artist, image, platform})
 
 **Middleware:**
 - JWT verification
@@ -423,7 +440,16 @@ npm run dev          # Start Vite dev server (localhost:5173)
 npm run build        # Production build
 npm run preview      # Preview production build
 npm run lint         # Run linter (if configured)
+npm test             # Run Vitest test suite
 ```
+
+**Testing Infrastructure:**
+- **Framework:** Vitest + React Testing Library
+- **Setup:** `src/test/setup.js` (global DOM/API mocks)
+- **Config:** Vite config `test` block with jsdom environment
+- **Test Count:** 38+ unit tests covering core utilities, hooks, components
+- **Coverage:** Tracks caption/overlay logic, weather hooks, music services
+- **Run:** `npm test` (watch mode), `npm test -- --coverage` (coverage report)
 
 **Multi-Brand Builds:**
 ```bash
