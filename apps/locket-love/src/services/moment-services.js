@@ -56,6 +56,28 @@ export const getAllMoments = async ({
 };
 
 /**
+ * Fetch the latest-moment payload, primarily for the streak counter shown on
+ * the Memories screen. Mirrors lovekit's GetLastestMoment body. Best-effort:
+ * returns the `result` blob ({ streak: { count, last_updated_yyyymmdd }, … }) or
+ * null on failure so callers can fall back to cache without crashing.
+ */
+export const getLatestMoment = async () => {
+  try {
+    const res = await api.post("/locket/proxy/getLatestMomentV2", {
+      data: {
+        excluded_users: [],
+        fetch_streak: true,
+        should_count_missed_moments: true,
+      },
+    });
+    return res.data?.result ?? null;
+  } catch (err) {
+    console.warn("[moment.services] getLatestMoment failed:", err?.message);
+    return null;
+  }
+};
+
+/**
  * Fetch detailed info for a single moment (reactions, viewers, etc.).
  */
 export const getInfoMoment = async (idMoment) => {
