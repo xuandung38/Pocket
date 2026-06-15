@@ -8,15 +8,16 @@
 // native Web Share sheet / copy-link (see utils/share-targets.js).
 
 import { useState } from "react";
-import { Instagram, MessageSquare, Share2, Download, Trash2 } from "lucide-react";
+import { MessageCircle, Share2, Download, Trash2 } from "lucide-react";
 import BottomSheet from "./bottom-sheet";
+import { InstagramLogo, SnapchatLogo, TikTokLogo } from "../ui/brand-logos";
 import {
   SonnerError,
   SonnerSuccess,
   SonnerWarning,
 } from "../ui/sonner-toast";
 import { useMomentsStoreV2 } from "@/stores";
-import { getMomentImage, getMomentOwnerUid } from "@/utils/moment-media";
+import { getMomentImage, getMomentOwnerUid, proxyImageUrl } from "@/utils/moment-media";
 import { downloadMoment } from "@/utils/download-moment";
 import { openShareTarget } from "@/utils/share-targets";
 
@@ -25,7 +26,7 @@ import { openShareTarget } from "@/utils/share-targets";
 async function buildShareFile(url) {
   if (!url) return undefined;
   try {
-    const res = await fetch(url, { mode: "cors" });
+    const res = await fetch(proxyImageUrl(url), { mode: "cors" });
     if (!res.ok) return undefined;
     const blob = await res.blob();
     return new File([blob], `locket_${Date.now()}.jpg`, {
@@ -37,11 +38,11 @@ async function buildShareFile(url) {
 }
 
 const TARGETS = [
-  { key: "instagram", label: "Instagram", icon: <Instagram size={22} />, bg: "linear-gradient(45deg,#f09433,#dc2743,#bc1888)" },
-  { key: "snapchat", label: "Snapchat", emoji: "👻", bg: "#FFFC00", fg: "#111" },
-  { key: "messages", label: "Tin nhắn", icon: <MessageSquare size={22} />, bg: "#22c55e" },
-  { key: "tiktok", label: "TikTok", emoji: "🎵", bg: "#111", fg: "#fff" },
-  { key: "other", label: "Khác", icon: <Share2 size={22} />, bg: "rgba(255,255,255,0.12)" },
+  { key: "instagram", label: "Instagram", icon: <InstagramLogo size={24} />, bg: "linear-gradient(45deg,#feda75,#fa7e1e,#d62976,#962fbf,#4f5bd5)" },
+  { key: "snapchat", label: "Snapchat", icon: <SnapchatLogo size={26} />, bg: "#FFFC00", fg: "#fff" },
+  { key: "messages", label: "Tin nhắn", icon: <MessageCircle size={24} fill="#fff" stroke="#fff" />, bg: "#34C759" },
+  { key: "tiktok", label: "TikTok", icon: <TikTokLogo size={22} />, bg: "#010101", fg: "#fff" },
+  { key: "other", label: "Khác", icon: <Share2 size={22} />, bg: "rgba(255,255,255,0.14)" },
 ];
 
 export default function MomentShareSheet({ open, moment, meUid, onClose }) {
@@ -142,27 +143,29 @@ export default function MomentShareSheet({ open, moment, meUid, onClose }) {
         ))}
       </div>
 
-      {/* Save / Delete */}
-      <div style={{ padding: "8px 16px 24px", display: "flex", flexDirection: "column", gap: 8 }}>
+      {/* Save / Delete — side by side (Lưu left, Xóa right) like Locket */}
+      <div style={{ padding: "8px 16px 24px", display: "flex", gap: 10 }}>
         <button
           onClick={handleSave}
           style={{
+            flex: 1,
             display: "flex",
+            flexDirection: "column",
             alignItems: "center",
-            gap: 12,
-            width: "100%",
-            padding: "14px 16px",
+            justifyContent: "center",
+            gap: 4,
+            padding: "14px 12px",
             borderRadius: 14,
             border: "none",
             background: "var(--bg-surface)",
             color: "var(--text-primary)",
-            fontSize: 15,
+            fontSize: 14,
             fontWeight: 600,
             cursor: "pointer",
           }}
         >
-          <Download size={20} />
-          Lưu ảnh
+          <Download size={22} />
+          Lưu
         </button>
 
         {isOwn && (
@@ -170,22 +173,24 @@ export default function MomentShareSheet({ open, moment, meUid, onClose }) {
             onClick={handleDelete}
             disabled={busy}
             style={{
+              flex: 1,
               display: "flex",
+              flexDirection: "column",
               alignItems: "center",
-              gap: 12,
-              width: "100%",
-              padding: "14px 16px",
+              justifyContent: "center",
+              gap: 4,
+              padding: "14px 12px",
               borderRadius: 14,
               border: "none",
               background: "var(--bg-surface)",
               color: "#ff5a5a",
-              fontSize: 15,
+              fontSize: 14,
               fontWeight: 600,
               cursor: busy ? "default" : "pointer",
               opacity: busy ? 0.6 : 1,
             }}
           >
-            <Trash2 size={20} />
+            <Trash2 size={22} />
             Xóa
           </button>
         )}
