@@ -46,4 +46,26 @@ describe("<CaptionOverlay>", () => {
     expect(container.querySelector(".caption-chip")).toBeTruthy();
     expect(screen.getByText("Lạ")).toBeInTheDocument();
   });
+
+  it("poll type via generic dispatch renders emoji display-only — no vote buttons", () => {
+    // CaptionOverlay lacks vote context; it must never render clickable vote
+    // buttons that would silently no-op. Verify the generic poll path is owner-
+    // style (display div, not <button> elements for the emoji options).
+    render(
+      <CaptionOverlay
+        overlay={normalizeOverlay({
+          type: "poll",
+          payload: { left_emoji: "🔥", right_emoji: "❄️" },
+        })}
+      />,
+    );
+    // Emojis are visible
+    expect(screen.getByText("🔥")).toBeInTheDocument();
+    expect(screen.getByText("❄️")).toBeInTheDocument();
+    // No interactive vote buttons — owner-style renders divs, not buttons
+    const voteButtons = screen
+      .queryAllByRole("button")
+      .filter((b) => b.textContent.includes("🔥") || b.textContent.includes("❄️"));
+    expect(voteButtons).toHaveLength(0);
+  });
 });

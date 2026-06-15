@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { Bell, Plus, ArrowUp, LayoutGrid, Share2 } from "lucide-react";
+import PollOverlay from "../components/caption-overlay/poll-overlay";
 
 // At the top of the feed, an upward wheel/swipe goes back to camera (mirrors camera→feed)
 const PULL_BACK_THRESHOLD = 50;
@@ -22,6 +23,25 @@ import {
 import { sendReactMoment } from "@/services/moment-services";
 import { normalizeOverlay } from "@/utils/caption-overlay-schema";
 import { SonnerError } from "../components/ui/sonner-toast";
+import { useReactionStore } from "@/stores/use-reaction-store";
+
+// -------------------------------------------------------------------------
+// Poll vote aggregation — exported for direct unit testing.
+// Groups moment.reactions by emoji and maps them onto the overlay's
+// left/right emoji pair. Returns isPoll:false when no poll payload exists
+// so callers can skip rendering the poll widget safely.
+// -------------------------------------------------------------------------
+export function computePollCounts(moment) {
+  const payload = moment?.overlays?.payload;
+  if (!payload?.left_emoji || !payload?.right_emoji) {
+    return { isPoll: false, leftCount: 0, rightCount: 0, leftEmoji: null, rightEmoji: null };
+  }
+  const { left_emoji, right_emoji } = payload;
+  const reactions = Array.isArray(moment.reactions) ? moment.reactions : [];
+  const leftCount  = reactions.filter((r) => r?.emoji === left_emoji).length;
+  const rightCount = reactions.filter((r) => r?.emoji === right_emoji).length;
+  return { isPoll: true, leftCount, rightCount, leftEmoji: left_emoji, rightEmoji: right_emoji };
+}
 
 // -------------------------------------------------------------------------
 // Backend moment shape varies across endpoints/proxies — read defensively.
@@ -255,6 +275,7 @@ function MomentCard({
   onOpenReactions,
   onSendQuickReaction,
   onOpenEmojiPicker,
+  onPollVote,
 }) {
   const ownerUid = getMomentOwnerUid(moment);
   const isOwn = ownerUid && ownerUid === meUid;
@@ -262,6 +283,8 @@ function MomentCard({
   const video = getMomentVideo(moment);
   const caption = getMomentCaption(moment);
   const momentOverlay = getMomentOverlay(moment);
+  const isPollMoment = momentOverlay?.type === "poll";
+  const pollCounts = isPollMoment ? computePollCounts(moment) : null;
   const ts = getMomentTimestampMs(moment);
   const timeAgo = formatTimeAgo(ts);
   const quickReactions = Array.isArray(moment.reactions) && moment.reactions.length > 0
@@ -347,9 +370,20 @@ function MomentCard({
               }}
             >
               {momentOverlay ? (
-                // Rich overlay (theme/gradient/image/snow) rendered client-side
-                // from the moment's metadata — caption is metadata, not baked.
-                <CaptionOverlay overlay={momentOverlay} />
+                isPollMoment ? (
+                  // Poll moments render their own chip with vote buttons (friend)
+                  // or vote counts (owner). onVote wires into sendReaction + triggerReaction.
+                  <PollOverlay
+                    overlayData={momentOverlay}
+                    pollVariant={isOwn ? "owner" : "friend"}
+                    pollCounts={pollCounts}
+                    momentId={moment.id}
+                    onVote={isOwn ? undefined : onPollVote}
+                  />
+                ) : (
+                  // All other rich overlays (theme/gradient/image/snow/weather…)
+                  <CaptionOverlay overlay={momentOverlay} />
+                )
               ) : (
                 // Backward-compat: plain-caption moments keep the flat bar.
                 <div
@@ -639,6 +673,8 @@ export default function FeedScreen() {
     return () => observer.disconnect();
   }, [canPaginate, hasMore, isLoadingMore, loading, loadMoreOlder, moments.length]);
 
+  const triggerReaction = useReactionStore((s) => s.triggerReaction);
+
   // Quick-tap reaction on a friend's moment. Optimistically toasts then fires
   // POST /locket/proxy/reactToMoment; rolls the toast back on failure so users
   // see an honest signal rather than a silent miss.
@@ -657,6 +693,13 @@ export default function FeedScreen() {
       console.error("[feed-screen] sendReaction failed:", err);
       SonnerError("Gửi cảm xúc thất bại!");
     }
+  }
+
+  // Poll vote: reuses sendReaction path + triggers burst animation.
+  // `moment` is closed-over per MomentCard via the onPollVote callback factory.
+  async function sendPollVote(moment, emoji) {
+    await sendReaction(moment, emoji);
+    triggerReaction(emoji);
   }
 
   // After EmojiStudio resolves, just close the picker state. EmojiStudio owns
@@ -775,6 +818,7 @@ export default function FeedScreen() {
                 onOpenReply={() => setReplyMoment(m)}
                 onSendQuickReaction={(emoji) => sendReaction(m, emoji)}
                 onOpenEmojiPicker={() => setEmojiPickerMoment(m)}
+                onPollVote={(emoji) => sendPollVote(m, emoji)}
               />
             );
           })

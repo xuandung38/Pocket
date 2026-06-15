@@ -14,6 +14,7 @@ import { Download, X, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import Avatar from "./ui/avatar";
 import PhotoCropper from "./photo-cropper";
 import CaptionOverlay from "./caption-overlay/caption-overlay";
+import PollOverlay from "./caption-overlay/poll-overlay";
 import CaptionPickerSheet from "./caption-picker/caption-picker-sheet";
 import MusicLinkSheet from "./caption-picker/music-link-sheet";
 import { useOverlayStore, useFrameStore } from "@/stores";
@@ -412,7 +413,17 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
                   );
                 })()
               ) : activeOverlay ? (
-                <CaptionOverlay overlay={activeOverlay} />
+                // Poll overlays use PollOverlay directly in owner-style (no vote
+                // buttons in compose preview — caller hasn't posted yet).
+                activeOverlay.type === "poll" ? (
+                  <PollOverlay
+                    overlayData={activeOverlay}
+                    pollVariant="owner"
+                    pollCounts={{ isPoll: false }}
+                  />
+                ) : (
+                  <CaptionOverlay overlay={activeOverlay} />
+                )
               ) : null}
             </div>
           </div>
@@ -563,6 +574,7 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
         onSelect={handleSelectOverlay}
         selectedFrameId={selectedFrame?.id ?? null}
         onSelectFrame={setSelectedFrame}
+        pollPayload={activeOverlay?.type === "poll" ? activeOverlay.payload ?? null : null}
         footer={
           <button
             className="pill-btn"

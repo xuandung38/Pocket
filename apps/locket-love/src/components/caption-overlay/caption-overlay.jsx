@@ -10,6 +10,7 @@ import LocationOverlay from "./location-overlay";
 import ReviewOverlay from "./review-overlay";
 import HeartOverlay from "./heart-overlay";
 import MusicOverlay from "./music-overlay";
+import PollOverlay from "./poll-overlay";
 
 // Display-only caption renderer shared by the compose preview and the feed.
 // Dispatches on overlay.type to a per-type chip. Editing is owned by the host
@@ -47,6 +48,12 @@ export default function CaptionOverlay({ overlay, raw }) {
       return <HeartOverlay overlay={ov} />;
     case "music":
       return <MusicOverlay overlay={ov} />;
+    case "poll":
+      // Display-only render — vote buttons require feed context (moment id,
+      // sendReaction, triggerReaction) that CaptionOverlay intentionally never
+      // receives. Real callers (feed-screen, captured-send-preview) render
+      // <PollOverlay> directly with the correct variant and callbacks.
+      return <PollOverlay overlayData={ov} pollVariant="owner" pollCounts={{ isPoll: false }} />;
     default:
       return <GradientOverlay overlay={ov} />;
   }

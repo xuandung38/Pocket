@@ -100,4 +100,33 @@ describe("normalizeOverlay", () => {
     normalizeOverlay({ caption: "mutate?" });
     expect(defaultOverlay.caption).toBe("");
   });
+
+  // Poll type — new tests for Phase 2
+  it("resolves type 'poll' and keeps payload.{left_emoji,right_emoji}", () => {
+    const ov = normalizeOverlay({
+      type: "poll",
+      payload: { left_emoji: "🔥", right_emoji: "❄️" },
+    });
+    expect(ov.type).toBe("poll");
+    expect(ov.payload.left_emoji).toBe("🔥");
+    expect(ov.payload.right_emoji).toBe("❄️");
+  });
+
+  it("resolves overlay_id 'caption:poll' to type 'poll'", () => {
+    const ov = normalizeOverlay({
+      overlay_id: "caption:poll",
+      payload: { left_emoji: "👍", right_emoji: "👎" },
+    });
+    expect(ov.type).toBe("poll");
+  });
+
+  it("resolves id 'caption:poll' (feed shape) to type 'poll'", () => {
+    const ov = normalizeOverlay({
+      id: "caption:poll",
+      type: "caption",
+      payload: { left_emoji: "😍", right_emoji: "😡" },
+    });
+    expect(ov.type).toBe("poll");
+    expect(ov.payload.left_emoji).toBe("😍");
+  });
 });
