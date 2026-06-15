@@ -16,19 +16,19 @@
 //   4. emitGetListMessage() to request initial snapshot.
 //   5. Unmount → unsubscribe (socket itself persists across screens).
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import Avatar from "../components/ui/avatar";
 import BottomNav from "../components/ui/bottom-nav";
-import { useAuthStore, useFriendStoreV2 } from "@/stores";
-import { getToken } from "@/utils";
 import {
-  connectSocket,
-  emitGetListMessage,
-  onListMessage,
-  onMessage,
-} from "@/services/socket-service";
+  useAuthStore,
+  useFriendStoreV2,
+  useChatStore,
+  selectConvMeta,
+} from "@/stores";
+import { getToken } from "@/utils";
+import { emitGetListMessage } from "@/services/socket-service";
 
 // Format a unix-seconds timestamp into a short relative label (e.g. "10p",
 // "5g", "2ngày"). Returns "" for falsy input.
@@ -50,85 +50,25 @@ export default function ChatListScreen() {
   const loading = useFriendStoreV2((s) => s.loading);
   const loadFriends = useFriendStoreV2((s) => s.loadFriends);
 
-  // Map<friendUid, { lastMessage, lastTime, unread }>
-  // Populated from socket `new_on_list_message` + `new_message_with_user`.
-  const [convMeta, setConvMeta] = useState({});
+  // Conversation metadata (last message / unread) lives in the chat store and
+  // is kept fresh by the store-owned socket listeners — so the list no longer
+  // resets to empty when re-entering this tab.
+  const convMeta = useChatStore(selectConvMeta);
+  const initSocket = useChatStore((s) => s.initSocket);
 
   // Bootstrap friends list if empty (e.g. cold-load directly into /messages).
   useEffect(() => {
     if (!friends?.length) loadFriends();
   }, [friends?.length, loadFriends]);
 
-  // Open the socket + subscribe to list-level events. Singleton so this is
-  // safe to call from multiple screens.
+  // Open the socket (store attaches listeners once) + request the list snapshot.
   useEffect(() => {
     const { idToken } = getToken();
     if (!idToken) return undefined;
-
-    connectSocket(idToken);
-
-    // Merge incoming conv summaries into our metadata map. Backend payload
-    // shape: [{ uid, with_user, latestMessage: { body, createdAt }, ... }]
-    const offList = onListMessage((data) => {
-      if (!Array.isArray(data) || !data.length) return;
-      setConvMeta((prev) => {
-        const next = { ...prev };
-        for (const conv of data) {
-          const peerUid = conv.with_user || conv.uid;
-          if (!peerUid) continue;
-          next[peerUid] = {
-            lastMessage:
-              conv.latestMessage?.body ??
-              conv.latestMessage?.text ??
-              prev[peerUid]?.lastMessage ??
-              "",
-            lastTime:
-              Number(conv.latestMessage?.createdAt) ||
-              Number(conv.update_time) ||
-              prev[peerUid]?.lastTime ||
-              0,
-            unread: Number(conv.unread || 0) || prev[peerUid]?.unread || 0,
-          };
-        }
-        return next;
-      });
-    });
-
-    // Live message pushes also touch the list (last-message preview).
-    const offMsg = onMessage((data) => {
-      if (!data) return;
-      const items = Array.isArray(data) ? data : [data];
-      setConvMeta((prev) => {
-        const next = { ...prev };
-        for (const msg of items) {
-          // Peer uid: if `sender` is me, use receiver; else use sender.
-          const me = user?.uid || user?.localId;
-          const peer =
-            msg.sender && msg.sender !== me
-              ? msg.sender
-              : msg.receiver_uid || msg.receiverUid || msg.with_user;
-          if (!peer) continue;
-          next[peer] = {
-            lastMessage: msg.body || msg.text || prev[peer]?.lastMessage || "",
-            lastTime:
-              Number(msg.createdAt) ||
-              Number(msg.update_time) ||
-              Math.floor(Date.now() / 1000),
-            unread: prev[peer]?.unread || 0,
-          };
-        }
-        return next;
-      });
-    });
-
-    // Request initial snapshot.
+    initSocket(idToken);
     emitGetListMessage();
-
-    return () => {
-      offList?.();
-      offMsg?.();
-    };
-  }, [user?.uid, user?.localId]);
+    return undefined;
+  }, [initSocket]);
 
   // Sorted display list — friends with chat metadata first (by recency),
   // then friends without any chat history at the bottom (alpha by name).

@@ -13,6 +13,12 @@ const WS_HEADERS = {
 
 // Map: socketId → WebSocket (Locket WS connection)
 const activeLocketWs = new Map();
+// Map: socketId → Map<peerUid, conversationId> — caches the peer→convId lookup
+// so we don't refetch the whole conversation list on every chat open.
+const convIdCache = new Map();
+// Map: socketId → peerUid currently subscribed — lets us reuse the upstream
+// Locket WS instead of closing+reopening when reopening the same conversation.
+const activePeer = new Map();
 
 function decodeToken(token) {
   const { valid } = checkTokenValid(token);
@@ -97,41 +103,61 @@ function setupChatNamespace(io) {
       if (!messageId) return;
       const peerUid = otherUserId || messageId;
 
-      // Close previous Locket WS for this socket
-      const prev = activeLocketWs.get(socket.id);
-      if (prev && prev.readyState < 2) prev.close();
-
-      // The client sends the peer's UID, but Firestore stores messages under
-      // conversations/{convId} where convId is the Locket conversation document
-      // ID (f.uid in users/{userId}/conversations), NOT the peer's UID.
-      // Look up the real conversation ID from the user's conversation list first.
-      let conversationId = peerUid;
-      try {
-        const { messages: convList } = await getAllMessages(idToken, localId);
-        const conv = convList.find(
-          (c) => c.with_user === peerUid || c.uid === peerUid,
-        );
-        if (conv?.uid) conversationId = conv.uid;
-      } catch (_) {
-        // keep peer UID fallback — may work on some deployments
+      // 1. Resolve conversationId via the per-socket cache first. The client
+      // sends the peer's UID, but Firestore stores messages under
+      // conversations/{convId} (the Locket conversation doc id, NOT the peer
+      // UID). Only fall back to the full conversation-list fetch on a cache
+      // miss, and prefill the whole mapping so opening other chats also hits.
+      let perSocket = convIdCache.get(socket.id);
+      if (!perSocket) {
+        perSocket = new Map();
+        convIdCache.set(socket.id, perSocket);
+      }
+      let conversationId = perSocket.get(peerUid);
+      if (!conversationId) {
+        try {
+          const { messages: convList } = await getAllMessages(idToken, localId);
+          for (const c of convList || []) {
+            if (c?.uid) perSocket.set(c.with_user || c.uid, c.uid);
+          }
+          conversationId = perSocket.get(peerUid) || peerUid;
+        } catch (_) {
+          conversationId = peerUid; // fallback — may work on some deployments
+        }
       }
 
-      // 1. Firestore REST for initial history
+      // 2. Reuse the upstream Locket WS when reopening the same conversation;
+      // only close+reopen when switching to a different peer.
+      const samePeer = activePeer.get(socket.id) === peerUid;
+      const prevWs = activeLocketWs.get(socket.id);
+      if (!samePeer && prevWs && prevWs.readyState < 2) prevWs.close();
+
+      // Stamp the owning conversation on every message so the client can bucket
+      // it deterministically. Own-message echoes carry sender=me but no
+      // receiver, so without this tag the client would have to guess the
+      // conversation from its active screen (wrong under fast navigation).
+      const tagConv = (msgs) =>
+        (msgs || []).map((m) => ({ ...m, conversation_uid: peerUid }));
+
+      // 3. Firestore REST for initial history (client de-dupes by id).
       try {
         const { messages } = await getMessagesWithUser(idToken, localId, conversationId);
-        if (messages?.length) socket.emit("new_message_with_user", messages);
+        if (messages?.length) socket.emit("new_message_with_user", tagConv(messages));
       } catch (_) {
         // fallback to WS only
       }
 
-      // 2. Open live WebSocket to Locket for real-time updates
-      const ws = openLocketChatWs(
-        localId,
-        peerUid,
-        idToken,
-        (msgs) => socket.emit("new_message_with_user", msgs),
-      );
-      activeLocketWs.set(socket.id, ws);
+      // 4. Open a live WS only when switching peer or the previous one died.
+      if (!samePeer || !prevWs || prevWs.readyState >= 2) {
+        const ws = openLocketChatWs(
+          localId,
+          peerUid,
+          idToken,
+          (msgs) => socket.emit("new_message_with_user", tagConv(msgs)),
+        );
+        activeLocketWs.set(socket.id, ws);
+      }
+      activePeer.set(socket.id, peerUid);
     });
 
     // ── Cleanup ────────────────────────────────────────────
@@ -139,6 +165,8 @@ function setupChatNamespace(io) {
       const ws = activeLocketWs.get(socket.id);
       if (ws && ws.readyState < 2) ws.close();
       activeLocketWs.delete(socket.id);
+      convIdCache.delete(socket.id);
+      activePeer.delete(socket.id);
     });
   });
 }

@@ -18,18 +18,14 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ChevronLeft, MoreHorizontal, Send } from "lucide-react";
+import { ChevronLeft, MoreHorizontal, Send, Loader2 } from "lucide-react";
 import Avatar from "../components/ui/avatar";
 import ChatBubble from "../components/ui/chat-bubble";
-import { useAuthStore, useFriendStoreV2 } from "@/stores";
+import { useFriendStoreV2, useChatStore, selectMessages } from "@/stores";
 import { getToken } from "@/utils";
 import { sendMessage, markReadMessage } from "@/services";
-import {
-  connectSocket,
-  emitGetMessagesWith,
-  emitTyping,
-  onMessage,
-} from "@/services/socket-service";
+import { emitTyping } from "@/services/socket-service";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 
 // Format unix-seconds → "HH:MM dd/mm" for message group headers.
 function formatMessageTime(secs) {
@@ -58,8 +54,16 @@ function debounce(fn, ms) {
 export default function ChatDetailScreen() {
   const { id: friendUid } = useParams();
   const navigate = useNavigate();
-  const user = useAuthStore((s) => s.user);
-  const myUid = user?.uid || user?.localId || "me";
+  // myUid comes from the chat store (set on initSocket from getToken().localId)
+  // so optimistic stubs, peer detection, and isOwn rendering all agree.
+  const myUid = useChatStore((s) => s.myUid) || getToken().localId || "me";
+
+  // Store-owned actions (stable refs).
+  const initSocket = useChatStore((s) => s.initSocket);
+  const openConversation = useChatStore((s) => s.openConversation);
+  const setUnreadZero = useChatStore((s) => s.setUnreadZero);
+  const addOptimistic = useChatStore((s) => s.addOptimistic);
+  const reconcileOptimistic = useChatStore((s) => s.reconcileOptimistic);
 
   // Friend lookup (read-only — friends array is hydrated by chat-list /
   // bootstrap; if direct-navigated, we still render with a placeholder).
@@ -75,71 +79,30 @@ export default function ChatDetailScreen() {
     );
   }, [friend]);
 
-  // Local message list — newest at index 0 to match backend ordering.
-  const [messages, setMessages] = useState([]);
+  // Message list comes from the store (survives navigation → no blank flash).
+  const messages = useChatStore(selectMessages(friendUid));
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const menuRef = useRef(null);
   const listEndRef = useRef(null);
 
-  // --- Socket subscription -------------------------------------------------
+  // --- Subscribe to this conversation -------------------------------------
+  // The store owns the socket listeners; here we just open the conversation
+  // (live WS + history fetch) WITHOUT clearing the cached list — that's what
+  // removes the blank-flash + full-reload on every open. Read-receipt is
+  // best-effort. No cleanup: the store keeps accumulating across navigations.
   useEffect(() => {
     if (!friendUid) return undefined;
     const { idToken } = getToken();
     if (!idToken) return undefined;
-
-    connectSocket(idToken);
-
-    // Append incoming messages (de-dup by id). The backend sends history +
-    // live updates on the same event channel.
-    const off = onMessage((data) => {
-      if (!data) return;
-      const items = Array.isArray(data) ? data : [data];
-      // Only accept messages relevant to this conversation. Backend sends
-      // all observed messages; filter by sender/receiver matching peer or me.
-      const relevant = items.filter((m) => {
-        if (!m?.id) return false;
-        const me = myUid;
-        return (
-          m.sender === friendUid ||
-          m.sender === me ||
-          m.receiver_uid === friendUid ||
-          m.receiverUid === friendUid
-        );
-      });
-      if (!relevant.length) return;
-      setMessages((prev) => {
-        const seen = new Set(prev.map((m) => m.id));
-        const merged = [...prev];
-        for (const msg of relevant) {
-          if (seen.has(msg.id)) {
-            // Update in place — server may emit reaction edits.
-            const idx = merged.findIndex((m) => m.id === msg.id);
-            if (idx >= 0) merged[idx] = { ...merged[idx], ...msg };
-          } else {
-            merged.unshift(msg);
-            seen.add(msg.id);
-          }
-        }
-        // Keep newest first.
-        return merged.sort(
-          (a, b) =>
-            Number(b.createdAt || b.update_time || 0) -
-            Number(a.createdAt || a.update_time || 0),
-        );
-      });
-    });
-
-    emitGetMessagesWith(friendUid);
-
-    // Best-effort read-receipt. We swallow failures inside markReadMessage.
+    initSocket(idToken);
+    openConversation(friendUid);
     markReadMessage(friendUid);
-
-    return () => {
-      off?.();
-    };
-  }, [friendUid, myUid]);
+    setUnreadZero(friendUid);
+    return undefined;
+  }, [friendUid, initSocket, openConversation, setUnreadZero]);
 
   // Scroll-to-bottom when new messages arrive. Newest sits at the bottom of
   // the visible column (rendered in reverse below).
@@ -152,42 +115,24 @@ export default function ChatDetailScreen() {
     const text = draft.trim();
     if (!text || sending || !friendUid) return;
 
-    // Optimistic local append. We use a temporary id; backend echo will
-    // overwrite via the dedupe-by-id branch in the socket handler above
-    // once the real id arrives.
-    const tmpId = `tmp-${Date.now()}`;
-    const nowSecs = Math.floor(Date.now() / 1000);
-    const optimistic = {
-      id: tmpId,
-      body: text,
-      sender: myUid,
-      createdAt: nowSecs,
-      update_time: nowSecs,
-      type: "text",
-      _pending: true,
-    };
-    setMessages((prev) => [optimistic, ...prev]);
+    // Optimistic stub lives in the store; the real backend echo replaces it
+    // (matched by sender+body) via mergeOne — no duplicate.
+    const tmpId = addOptimistic(friendUid, { body: text });
     setDraft("");
     setSending(true);
 
     try {
       await sendMessage({ receiver_uid: friendUid, message: text });
-      // Real message will come back via socket. Drop the optimistic stub
-      // once a real one with matching body+sender arrives — for now, mark
-      // the optimistic as delivered (no longer pending) so the UI doesn't
-      // show a stale spinner if socket is slow.
-      setMessages((prev) =>
-        prev.map((m) => (m.id === tmpId ? { ...m, _pending: false } : m)),
-      );
+      reconcileOptimistic(friendUid, tmpId, { ok: true });
     } catch (err) {
       console.error("[chat-detail] send failed:", err?.message);
-      // Rollback optimistic message + restore draft so user can retry.
-      setMessages((prev) => prev.filter((m) => m.id !== tmpId));
+      // Rollback the stub + restore draft so the user can retry.
+      reconcileOptimistic(friendUid, tmpId, { ok: false });
       setDraft(text);
     } finally {
       setSending(false);
     }
-  }, [draft, sending, friendUid, myUid]);
+  }, [draft, sending, friendUid, addOptimistic, reconcileOptimistic]);
 
   // Debounced typing emit (no-op against current backend — see socket-service).
   const emitTypingDebounced = useMemo(
@@ -212,6 +157,23 @@ export default function ChatDetailScreen() {
     },
     [handleSend],
   );
+
+  // --- Pull-to-refresh -----------------------------------------------------
+  // Pull down at the top to re-sync this conversation. Re-emitting fetches the
+  // latest from the backend; the store merges (dedupe-by-id) so only genuinely
+  // new messages append. Socket delivery is fire-and-forget, so we show the
+  // spinner briefly rather than awaiting a (non-existent) promise.
+  const handleRefresh = useCallback(() => {
+    if (refreshing || !friendUid) return;
+    setRefreshing(true);
+    openConversation(friendUid);
+    setTimeout(() => setRefreshing(false), 900);
+  }, [refreshing, friendUid, openConversation]);
+
+  const { pull, threshold, handlers: pullHandlers } = usePullToRefresh({
+    onRefresh: handleRefresh,
+    enabled: !refreshing,
+  });
 
   // --- More-options menu --------------------------------------------------
   useEffect(() => {
@@ -322,6 +284,7 @@ export default function ChatDetailScreen() {
       {/* Message list (oldest at top, newest at bottom) */}
       <div
         className="scroll-area"
+        {...pullHandlers}
         style={{
           flex: 1,
           padding: "8px 16px",
@@ -331,6 +294,30 @@ export default function ChatDetailScreen() {
           paddingBottom: 80,
         }}
       >
+        {/* Pull-to-refresh indicator (top). Visible while dragging or syncing. */}
+        {(pull > 0 || refreshing) && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              height: refreshing ? 36 : pull,
+              overflow: "hidden",
+              flexShrink: 0,
+              color: "var(--text-tertiary)",
+              transition: refreshing ? "height 0.2s ease" : "none",
+            }}
+          >
+            <Loader2
+              size={20}
+              className="animate-spin"
+              style={{
+                opacity: refreshing ? 1 : Math.min(pull / threshold, 1),
+                animationPlayState: refreshing ? "running" : "paused",
+              }}
+            />
+          </div>
+        )}
         {displayed.length === 0 ? (
           <div
             style={{
