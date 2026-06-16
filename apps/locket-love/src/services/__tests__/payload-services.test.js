@@ -38,7 +38,7 @@ import { createRequestPayloadV5 } from "../payload-services";
 
 const fakeFile = new File(["data"], "test.mp4", { type: "video/mp4" });
 
-describe("createRequestPayloadV5 — video_frame_url", () => {
+describe("createRequestPayloadV5 — video_frame_url (PNG frame)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -92,5 +92,59 @@ describe("createRequestPayloadV5 — video_frame_url", () => {
     expect(payload.options.video_frame_url).toBe(url);
     expect(payload.options.caption).toBe("Hello");
     expect(payload.options.color_top).toBe("#000");
+  });
+});
+
+describe("createRequestPayloadV5 — video_frame_polaroid (polaroid frame)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("does NOT include video_frame_polaroid when videoFramePolaroid is absent", async () => {
+    const payload = await createRequestPayloadV5({
+      mediaFile: fakeFile,
+      previewType: "video",
+    });
+    expect(payload.options).not.toHaveProperty("video_frame_polaroid");
+  });
+
+  it("does NOT include video_frame_polaroid when videoFramePolaroid is undefined", async () => {
+    const payload = await createRequestPayloadV5({
+      mediaFile: fakeFile,
+      previewType: "video",
+      videoFramePolaroid: undefined,
+    });
+    expect(payload.options).not.toHaveProperty("video_frame_polaroid");
+  });
+
+  it("includes video_frame_polaroid as JSON string when spec provided", async () => {
+    const spec = { caption: "Xin chào", date: "16/06/2026" };
+    const payload = await createRequestPayloadV5({
+      mediaFile: fakeFile,
+      previewType: "video",
+      videoFramePolaroid: spec,
+    });
+    expect(payload.options.video_frame_polaroid).toBe(JSON.stringify(spec));
+  });
+
+  it("parses back to original spec shape (round-trip)", async () => {
+    const spec = { caption: "Test caption", date: "16/06/2026" };
+    const payload = await createRequestPayloadV5({
+      mediaFile: fakeFile,
+      previewType: "video",
+      videoFramePolaroid: spec,
+    });
+    const parsed = JSON.parse(payload.options.video_frame_polaroid);
+    expect(parsed).toEqual(spec);
+  });
+
+  it("does not include polaroid when png frame is used instead", async () => {
+    const payload = await createRequestPayloadV5({
+      mediaFile: fakeFile,
+      previewType: "video",
+      videoFrameUrl: "https://example.com/frame.png",
+    });
+    expect(payload.options).not.toHaveProperty("video_frame_polaroid");
+    expect(payload.options.video_frame_url).toBeTruthy();
   });
 });

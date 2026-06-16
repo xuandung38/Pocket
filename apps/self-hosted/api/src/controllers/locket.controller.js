@@ -468,11 +468,21 @@ class LocketController {
       } else if (type === "video") {
         // Pass the PNG frame URL (if provided) so ffmpeg can bake it into the video.
         const frameUrl = optionsData?.video_frame_url || null;
+        // Parse the polaroid spec from JSON string (sent as serialized by the client).
+        let polaroid = null;
+        if (optionsData?.video_frame_polaroid) {
+          try {
+            polaroid = JSON.parse(optionsData.video_frame_polaroid);
+          } catch {
+            // Malformed JSON — skip polaroid, upload un-framed.
+          }
+        }
         processedBuffer = await processServices.processVideoBuffer({
           videoBuffer: mediaBuffer,
           filename: name,
           maxSizeMB: 5,
           frameUrl,
+          polaroid,
         });
 
         thumbBuffer = await processServices.generateThumbnail(

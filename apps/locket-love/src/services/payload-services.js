@@ -36,6 +36,7 @@ function determineRecipients(audience, selectedRecipients, localId) {
  * @param {"all"|"selected"|"private"} [args.audience="all"]
  * @param {string[]} [args.recipients=[]]    - friend uids when `audience === "selected"`
  * @param {string} [args.videoFrameUrl]      - PNG frame URL for server-side video overlay (PNG frames only)
+ * @param {{ caption: string, date: string }} [args.videoFramePolaroid] - polaroid spec for server-side video bake
  * @returns {Promise<object|null>}           - payload ready to POST, or null on auth-fail
  */
 export const createRequestPayloadV5 = async ({
@@ -46,6 +47,7 @@ export const createRequestPayloadV5 = async ({
   audience = "all",
   recipients = [],
   videoFrameUrl,
+  videoFramePolaroid,
 } = {}) => {
   if (!mediaFile) throw new Error("createRequestPayloadV5: mediaFile is required");
 
@@ -72,6 +74,9 @@ export const createRequestPayloadV5 = async ({
     // Include the PNG frame URL only when present — lets the backend bake the
     // frame into the video via ffmpeg overlay without changing the default path.
     ...(videoFrameUrl && { video_frame_url: videoFrameUrl }),
+    // Polaroid spec: serialized so the backend can parse { caption, date } and
+    // render the white-border + text strip via sharp + ffmpeg.
+    ...(videoFramePolaroid && { video_frame_polaroid: JSON.stringify(videoFramePolaroid) }),
   };
 
   // Push the media to the self-hosted R2 storage service (presignedV3), exactly

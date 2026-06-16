@@ -4,6 +4,7 @@ const ffmpeg = require("fluent-ffmpeg");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const sharp = require("sharp");
 const { logInfo, logSuccess, logWarning, logTable } = require("../../utils/logEventUtils");
 
 ffmpeg.setFfmpegPath(ffmpegPath);
@@ -428,9 +429,10 @@ const convertFormat = (inputPath, outputPath, metadata) => {
 // MAIN PROCESSING FUNCTION
 // ============================================================================
 
-const processVideoBuffer = ({ videoBuffer, filename = "temp", maxSizeMB = 5, frameUrl = null }) => {
+const processVideoBuffer = ({ videoBuffer, filename = "temp", maxSizeMB = 5, frameUrl = null, polaroid = null }) => {
   return new Promise(async (resolve, reject) => {
-    logInfo("processVideoBuffer", `Start processing: ${filename}${frameUrl ? " (with PNG frame)" : ""}`);
+    const frameTag = frameUrl ? " (with PNG frame)" : polaroid ? " (with polaroid frame)" : "";
+    logInfo("processVideoBuffer", `Start processing: ${filename}${frameTag}`);
 
     const tmpDir = getTempDir();
     const timestamp = Date.now();
@@ -463,7 +465,7 @@ const processVideoBuffer = ({ videoBuffer, filename = "temp", maxSizeMB = 5, fra
       // STEP 2: Check if processing needed
       const processingCheck = needsProcessing(metadata, maxSizeMB);
       
-      if (!processingCheck.needed && !frameUrl) {
+      if (!processingCheck.needed && !frameUrl && !polaroid) {
         // Video is already 1080² mp4 under the size cap and no frame overlay needed.
         const resultBuffer = fs.readFileSync(inputPath);
         cleanup(...needsCleanup);
@@ -544,6 +546,26 @@ const processVideoBuffer = ({ videoBuffer, filename = "temp", maxSizeMB = 5, fra
           cleanup(framedPath);
         } finally {
           if (framePng) cleanup(framePng);
+        }
+      }
+
+      // STEP 7: Polaroid frame — build the white-border + text-strip PNG via sharp,
+      // then reuse overlayFrameOnVideo to bake it. Graceful fallback on any error.
+      if (polaroid) {
+        let polaroidPng = null;
+        const polaroidPath = path.join(tmpDir, `${timestamp}_${filename}_polaroid.mp4`);
+        try {
+          polaroidPng = await buildPolaroidFramePng(polaroid, tmpDir, timestamp);
+          await overlayFrameOnVideo(currentPath, polaroidPng, polaroidPath);
+          needsCleanup.push(polaroidPath);
+          currentPath = polaroidPath;
+          logSuccess("processVideoBuffer", "Polaroid frame baked into video");
+        } catch (polaroidErr) {
+          // Non-fatal: log and continue with the un-framed video.
+          logWarning("processVideoBuffer", `Polaroid overlay skipped: ${polaroidErr.message}`);
+          cleanup(polaroidPath);
+        } finally {
+          if (polaroidPng) cleanup(polaroidPng);
         }
       }
 
@@ -638,6 +660,145 @@ const overlayFrameOnVideo = (inputPath, framePng, outputPath) => {
 
     command.save(outputPath);
   });
+};
+
+// ============================================================================
+// STEP 7: POLAROID FRAME — render border + text strip via sharp, then overlay
+// ============================================================================
+
+// Polaroid geometry mirrors compose-frame.js at 1080×1080 canvas size exactly:
+//   white border: 48px top/left/right; bottom strip 228px (1080-852)
+//   photo inset: x=48, y=48, w=984, h=804 → bottom edge y=852
+//   date text (30px): centered at y=927 (852 + 228*0.33)
+//   caption text (38px): centered at y=1005 (852 + 228*0.67)
+const POLAROID_SIZE = 1080;
+const POLAROID_BORDER = 48;         // top / left / right white border
+const POLAROID_PHOTO_W = 984;       // POLAROID_SIZE - 2*POLAROID_BORDER
+const POLAROID_PHOTO_H = 804;       // empirical: leaves 228px bottom strip
+const POLAROID_STRIP_TOP = POLAROID_BORDER + POLAROID_PHOTO_H; // 852
+const POLAROID_STRIP_H = POLAROID_SIZE - POLAROID_STRIP_TOP;    // 228
+const POLAROID_DATE_Y = Math.round(POLAROID_STRIP_TOP + POLAROID_STRIP_H * 0.33);  // 927
+const POLAROID_CAPTION_Y = Math.round(POLAROID_STRIP_TOP + POLAROID_STRIP_H * 0.67); // 1005
+const TEXT_COLOR = "#333333";
+const DATE_FONT_SIZE = 30;
+const CAPTION_FONT_SIZE = 38;
+const TEXT_MAX_CHARS = 40; // safety truncation before SVG render
+
+/**
+ * Truncate text to at most `max` chars, appending "…" when cut.
+ * This is a conservative estimate used before SVG; SVG has no measureText.
+ */
+// Escape XML so a caption containing & < > " ' can't break the SVG composite
+// (an unescaped char throws inside sharp → polaroid would silently not apply).
+const escapeXML = (text) =>
+  String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+
+const truncateSVGText = (text, max) => {
+  const str = String(text);
+  const truncated = str.length > max ? str.slice(0, max - 1) + "…" : str;
+  return escapeXML(truncated);
+};
+
+/**
+ * Build a 1080×1080 RGBA PNG that acts as the polaroid frame overlay:
+ *   - white on all border areas (top 48px, left 48px, right 48px, bottom 228px)
+ *   - transparent cut-out in the inner 984×804 photo area so the video shows through
+ *   - date + caption rendered in the bottom white strip via SVG composite
+ *
+ * Returns the path of the temp PNG file.
+ */
+const buildPolaroidFramePng = async (polaroid, tmpDir, timestamp) => {
+  const { date = "", caption = "" } = polaroid;
+
+  // Build SVG text elements for the bottom strip. Using dominant-baseline and
+  // text-anchor to match the Canvas 2D textBaseline:"middle" + textAlign:"center".
+  const centerX = POLAROID_SIZE / 2;
+
+  let svgText = "";
+  if (date && caption) {
+    // Two-line: date (lighter) then caption (bolder)
+    svgText = `
+      <text x="${centerX}" y="${POLAROID_DATE_Y}"
+            font-family="DejaVu Sans, sans-serif" font-size="${DATE_FONT_SIZE}"
+            font-weight="500" fill="${TEXT_COLOR}"
+            text-anchor="middle" dominant-baseline="middle">
+        ${truncateSVGText(date, TEXT_MAX_CHARS)}
+      </text>
+      <text x="${centerX}" y="${POLAROID_CAPTION_Y}"
+            font-family="DejaVu Sans, sans-serif" font-size="${CAPTION_FONT_SIZE}"
+            font-weight="600" fill="${TEXT_COLOR}"
+            text-anchor="middle" dominant-baseline="middle">
+        ${truncateSVGText(caption, TEXT_MAX_CHARS)}
+      </text>`;
+  } else {
+    const singleText = date || caption;
+    if (singleText) {
+      const midY = Math.round(POLAROID_STRIP_TOP + POLAROID_STRIP_H / 2);
+      svgText = `
+        <text x="${centerX}" y="${midY}"
+              font-family="DejaVu Sans, sans-serif" font-size="${DATE_FONT_SIZE}"
+              font-weight="500" fill="${TEXT_COLOR}"
+              text-anchor="middle" dominant-baseline="middle">
+          ${truncateSVGText(singleText, TEXT_MAX_CHARS)}
+        </text>`;
+    }
+  }
+
+  // SVG overlay: only renders into the bottom strip area. The inner photo
+  // area remains transparent so the video frame shows through after compositing.
+  const svgOverlay = Buffer.from(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="${POLAROID_SIZE}" height="${POLAROID_SIZE}">
+      ${svgText}
+    </svg>`);
+
+  // Step A: Create white 1080×1080, then punch out the inner photo area to alpha=0.
+  // sharp doesn't have a direct "cut rectangle to transparent" op, but we can achieve
+  // it via a composite with a black PNG in "dest-out" blend mode.
+  const innerCutout = await sharp({
+    create: {
+      width: POLAROID_PHOTO_W,
+      height: POLAROID_PHOTO_H,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 1 },
+    },
+  }).png().toBuffer();
+
+  const framePngBuffer = await sharp({
+    create: {
+      width: POLAROID_SIZE,
+      height: POLAROID_SIZE,
+      channels: 4,
+      background: { r: 255, g: 255, b: 255, alpha: 1 }, // white
+    },
+  })
+    .composite([
+      // Punch out the inner photo area to transparent using dest-out blend.
+      {
+        input: innerCutout,
+        left: POLAROID_BORDER,
+        top: POLAROID_BORDER,
+        blend: "dest-out",
+      },
+      // Render date/caption SVG on top of the (now transparent-centre) white frame.
+      {
+        input: svgOverlay,
+        left: 0,
+        top: 0,
+        blend: "over",
+      },
+    ])
+    .png()
+    .toBuffer();
+
+  const framePath = path.join(tmpDir, `${timestamp}_polaroid_frame.png`);
+  fs.writeFileSync(framePath, framePngBuffer);
+  logInfo("buildPolaroidFramePng", `Built polaroid frame PNG (${(framePngBuffer.length / 1024).toFixed(1)}KB)`);
+  return framePath;
 };
 
 // ============================================================================

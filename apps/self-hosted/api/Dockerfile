@@ -1,6 +1,11 @@
 # Locket Dio Self-hosted API
 FROM node:20-slim
 
+# Install DejaVu fonts so sharp can embed text in SVG composites.
+# fonts-dejavu-core provides DejaVuSans*.ttf referenced in buildPolaroidFramePng.
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
 # Tạo thư mục làm việc trong container
 WORKDIR /app
 

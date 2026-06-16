@@ -193,6 +193,14 @@ export default function CameraScreen() {
         const videoFrameUrl =
           shot.type === "video" && frame?.type === "png" ? frame.url : undefined;
 
+        // For polaroid frames on video: send the spec (date + caption) to the
+        // backend so it can render the white border + text strip via ffmpeg.
+        // Date is injected here (post time) to match how compose-frame.js does it.
+        const videoFramePolaroid =
+          shot.type === "video" && frame?.type === "polaroid"
+            ? { caption, date: new Date().toLocaleDateString("vi-VN") }
+            : undefined;
+
         const payload = await createRequestPayloadV5({
           mediaFile: fileToUpload,
           previewType: shot.type,
@@ -201,6 +209,7 @@ export default function CameraScreen() {
           audience,
           recipients,
           videoFrameUrl,
+          videoFramePolaroid,
         });
         if (!payload) throw new Error("Không tạo được payload.");
 
