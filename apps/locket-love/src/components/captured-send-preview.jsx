@@ -47,7 +47,7 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
   // Ref forwarded into PhotoCropper; used in handleSend to extract the 1080² crop.
   const cropperRef = useRef(null);
 
-  const { captionOverlays, fetchCaptionOverlays } = useOverlayStore();
+  const { sections: overlaySections, captionOverlays, fetchCaptionOverlays } = useOverlayStore();
   useEffect(() => { fetchCaptionOverlays(); }, [fetchCaptionOverlays]);
 
   // Pre-warm the frame library so the picker opens instantly.
@@ -564,12 +564,12 @@ export default function CapturedSendPreview({ shot, friends = [], isPosting, onP
         </div>
       </div>
 
-      {/* Caption Sheet — sectioned picker (Themes/Special/Icon/GIF; later phases
-          plug system/image/music sections + the music button footer). */}
+      {/* Caption Sheet — VIP/General/Decorative tiers over the Locket Dio v2
+          sections + frame + system + poll + the music button footer. */}
       <CaptionPickerSheet
         open={activeSheet === "caption"}
         onClose={() => setActiveSheet(null)}
-        captionOverlays={captionOverlays}
+        sections={overlaySections}
         selectedId={selectedOverlay?.overlay_id ?? null}
         onSelect={handleSelectOverlay}
         selectedFrameId={selectedFrame?.id ?? null}

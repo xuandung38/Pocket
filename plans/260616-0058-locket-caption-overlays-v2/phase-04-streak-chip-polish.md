@@ -1,10 +1,11 @@
 ---
 phase: 4
-title: "Streak chip + polish"
-status: pending
+title: Streak chip + polish
+status: completed
 priority: P2
-effort: "1.5h"
-dependencies: [3]
+effort: 1.5h
+dependencies:
+  - 3
 ---
 
 # Phase 4: Streak chip + polish

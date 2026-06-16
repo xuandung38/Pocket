@@ -1,9 +1,9 @@
 ---
 phase: 1
-title: "Backend overlays proxy"
-status: pending
+title: Backend overlays proxy
+status: completed
 priority: P1
-effort: "2h"
+effort: 2h
 dependencies: []
 ---
 

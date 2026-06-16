@@ -1,10 +1,11 @@
 ---
 phase: 2
-title: "FE data layer v2 shape"
-status: pending
+title: FE data layer v2 shape
+status: completed
 priority: P1
-effort: "2h"
-dependencies: [1]
+effort: 2h
+dependencies:
+  - 1
 ---
 
 # Phase 2: FE data layer v2 shape

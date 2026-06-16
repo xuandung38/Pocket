@@ -1,50 +1,78 @@
 // use-overlay-store.js
-// Caption overlay themes store — mirrors web/lovekit useOverlayStore.
-// Fetches from GET /v1/public/themes, groups by type, caches in sessionStorage.
-// Self-hosted backend returns [] for now; full deployment returns real themes.
+// Caption overlay store. Fetches the Locket Dio v2 sectioned dataset from
+// GET /v1/public/getAllOverlaysV2 (proxied by the self-hosted backend), caches
+// in sessionStorage.
+//
+// Exposes TWO views of the same data so both new and legacy consumers work:
+//   - `sections`: ordered [{ section_id, name, order_id, items: normalized[] }]
+//                 → the caption-picker tiers render from this.
+//   - `captionOverlays`: legacy type-keyed map (custome/decorative/...) derived
+//                 for backward-compat (e.g. captured-send-preview quickCaptions).
 
 import { create } from "zustand";
 import { getAllOverlayCaption } from "@/services/overlay-services";
+import { normalizeOverlay } from "@/utils/caption-overlay-schema";
 
-const CACHE_KEY = "captionOverlays";
+const CACHE_KEY = "captionOverlaysV2";
 
-const sortByOrder = (list) =>
-  [...list].sort((a, b) => (a.order_index ?? 9999) - (b.order_index ?? 9999));
-
-function groupByType(themes) {
-  return {
-    decorative: sortByOrder(themes.filter((t) => t.type === "decorative")),
-    custome: sortByOrder(themes.filter((t) => t.type === "custome")),
-    background: sortByOrder(themes.filter((t) => t.type === "background")),
-    image_icon: sortByOrder(themes.filter((t) => t.type === "image_icon")),
-    image_gif: sortByOrder(themes.filter((t) => t.type === "image_gif")),
-    special: sortByOrder(themes.filter((t) => t.type === "special")),
-  };
-}
-
-const EMPTY = {
-  decorative: [],
-  custome: [],
-  background: [],
-  image_icon: [],
-  image_gif: [],
-  special: [],
+// Map a v2 section_id onto a legacy captionOverlays key. Only the keys actually
+// read downstream (captured-send-preview quickCaptions reads `.custome` +
+// `.decorative`) are kept — other sections render via `sections`, not this map.
+const SECTION_TO_LEGACY = {
+  suggest: "custome",
+  decorative: "decorative",
+  decorative_by_locketdio: "decorative",
 };
 
+const EMPTY_LEGACY = {
+  custome: [],
+  decorative: [],
+};
+
+const byOrder = (a, b) => (a.order_id ?? a.order_index ?? 9999) - (b.order_id ?? b.order_index ?? 9999);
+
+// Build both views from the raw upstream sections array.
+function buildViews(rawSections) {
+  const sections = [...rawSections]
+    .filter((s) => s && s.active !== false)
+    .sort(byOrder)
+    .map((s) => ({
+      section_id: s.section_id,
+      name: s.name,
+      order_id: s.order_id,
+      items: (s.items || [])
+        .filter((it) => it && it.active !== false)
+        .sort(byOrder)
+        .map(normalizeOverlay),
+    }));
+
+  const captionOverlays = { ...EMPTY_LEGACY };
+  for (const s of sections) {
+    const key = SECTION_TO_LEGACY[s.section_id];
+    if (key) captionOverlays[key] = [...captionOverlays[key], ...s.items];
+  }
+
+  return { sections, captionOverlays };
+}
+
 export const useOverlayStore = create((set, get) => ({
-  captionOverlays: EMPTY,
+  sections: [],
+  captionOverlays: EMPTY_LEGACY,
   isLoading: false,
 
   fetchCaptionOverlays: async () => {
     // Already loaded — skip
-    if (get().captionOverlays.decorative.length > 0) return;
+    if (get().sections.length > 0) return;
 
-    // Check sessionStorage cache first
+    // sessionStorage cache first
     try {
       const cached = sessionStorage.getItem(CACHE_KEY);
       if (cached) {
-        set({ captionOverlays: JSON.parse(cached) });
-        return;
+        const parsed = JSON.parse(cached);
+        if (parsed?.sections?.length) {
+          set({ sections: parsed.sections, captionOverlays: parsed.captionOverlays });
+          return;
+        }
       }
     } catch {
       /* ignore parse errors — fall through to network */
@@ -52,15 +80,15 @@ export const useOverlayStore = create((set, get) => ({
 
     set({ isLoading: true });
     try {
-      const themes = await getAllOverlayCaption();
-      if (!themes?.length) return;
-      const grouped = groupByType(themes);
+      const raw = await getAllOverlayCaption();
+      if (!raw?.length) return;
+      const views = buildViews(raw);
       try {
-        sessionStorage.setItem(CACHE_KEY, JSON.stringify(grouped));
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify(views));
       } catch {
         /* quota exceeded — skip caching */
       }
-      set({ captionOverlays: grouped });
+      set(views);
     } catch (err) {
       console.error("[useOverlayStore] fetchCaptionOverlays failed:", err);
     } finally {
@@ -70,6 +98,6 @@ export const useOverlayStore = create((set, get) => ({
 
   clearCaptionOverlays: () => {
     try { sessionStorage.removeItem(CACHE_KEY); } catch { /* noop */ }
-    set({ captionOverlays: EMPTY });
+    set({ sections: [], captionOverlays: EMPTY_LEGACY });
   },
 }));

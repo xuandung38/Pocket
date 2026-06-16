@@ -4,8 +4,9 @@
 // forward them upstream via onSelect. Weather resolves async (geolocation →
 // API) tracked with an "awaiting" flag; location opens its own picker sheet.
 import { useState, useEffect } from "react";
-import { Clock, Cloud, Battery, MapPin, Star, Heart } from "lucide-react";
+import { Clock, Cloud, Battery, MapPin, Star, Heart, Flame } from "lucide-react";
 import { normalizeOverlay } from "@/utils/caption-overlay-schema";
+import { useMemoriesStore } from "@/stores/use-memories-store";
 import { useWeather } from "@/hooks/use-weather";
 import { useBattery } from "@/hooks/use-battery";
 import { SonnerError } from "@/components/ui/sonner-toast";
@@ -49,6 +50,9 @@ export default function SystemSection({ onSelect }) {
   const [locationOpen, setLocationOpen] = useState(false);
   // Flag set when the user taps Weather; cleared once the fetch resolves.
   const [awaitWeather, setAwaitWeather] = useState(false);
+  // Streak comes from the memories store (synced from getLatestMoment). Hidden
+  // when absent — never show a fake 0.
+  const streak = useMemoriesStore((s) => s.streak);
 
   // Forward the weather overlay once the pending fetch completes
   useEffect(() => {
@@ -92,6 +96,20 @@ export default function SystemSection({ onSelect }) {
     onSelect(normalizeOverlay({ type: "heart", caption: "inlove" }));
   };
 
+  const handleStreak = () => {
+    if (!streak?.count) return;
+    onSelect(
+      normalizeOverlay({
+        type: "streak",
+        caption: String(streak.count),
+        icon: "🔥",
+        color_top: "#FFB300",
+        color_bottom: "#FF6D00",
+        text_color: "#FFFFFF",
+      }),
+    );
+  };
+
   const handleReviewSubmit = ({ rating, text }) => {
     onSelect(normalizeOverlay({ type: "review", icon: rating, caption: text }));
   };
@@ -133,6 +151,14 @@ export default function SystemSection({ onSelect }) {
           icon={<Heart size={20} fill="currentColor" strokeWidth={0} />}
           label="Tim"
         />
+        {/* Streak — only when the memories store has a count (never fake 0) */}
+        {streak?.count > 0 && (
+          <SystemButton
+            onClick={handleStreak}
+            icon={<Flame size={20} />}
+            label="Streak"
+          />
+        )}
       </div>
 
       <ReviewFormSheet

@@ -1,10 +1,11 @@
 ---
 phase: 3
-title: "Render v2 types + sectioned picker"
-status: pending
+title: Render v2 types + sectioned picker
+status: completed
 priority: P1
-effort: "3h"
-dependencies: [2]
+effort: 3h
+dependencies:
+  - 2
 ---
 
 # Phase 3: Render v2 types + sectioned picker
@@ -19,7 +20,13 @@ Render đủ 6 loại item v2 trong CaptionOverlay và hiển thị caption-pick
   - `caption_image`: badge PNG (icon.data url).
   - `caption_gif`: GIF (icon.data url).
   - `star_sign`: ảnh zodiac + text ("Mùa <cung>").
-- Picker chia tier: **VIP** = photo frame (đã có) + section `suggest`/đặc sắc?; **General** = custome/text + system; **Decorative** = decorative/template/caption_image/caption_gif/star_sign — HOẶC render theo đúng section name của data (suggest/Decorative by Locket/by Dio/Icon/Gif/Cung hoàng đạo). Chốt mapping khi cook: ưu tiên giữ section name gốc dưới 3 tier.
+- Picker chia tier (CHỐT — Validation S1):
+  - **VIP**: photo frame (FrameSection) **+ caption_image + caption_gif** (early access).
+  - **General**: `suggest` (custom gradient, **editable** — áp gradient+text_color vào ô nhập, user gõ text) + SystemSection (weather/time/location/music/streak).
+  - **Decorative**: `decorative` + `template` + `star_sign` (zodiac).
+- Giữ section name gốc làm label phụ trong mỗi tier.
+- caption_image/caption_gif: render client-side qua overlay metadata (icon.data url); KHÔNG bake vào file gửi.
+- **[CRITICAL]** Đọc lại baseline `caption-picker-sheet.jsx` (đã có Poll section/EmojiPollModal từ luồng song song) + `caption-overlay-schema.js` (có thể đã v2-aware một phần qua `getMomentOverlay`) TRƯỚC khi sửa; rebase, không clobber Poll.
 
 ## Architecture
 - `caption-overlay/caption-overlay.jsx`: thêm nhánh render theo `type` v2 (image badge, gif, zodiac image). Tái dùng gradient/text hiện có cho custom/decorative/template.

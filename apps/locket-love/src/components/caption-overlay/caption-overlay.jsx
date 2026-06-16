@@ -27,12 +27,21 @@ export default function CaptionOverlay({ overlay, raw }) {
       return <DefaultOverlay overlay={ov} />;
     case "image_icon":
     case "image_gif":
+    // Locket Dio v2 image-based caption types (badge PNG, GIF, zodiac image).
+    // star_sign carries both an image icon and "Mùa <cung>" text → the
+    // image+text pill fits it too.
+    case "caption_image":
+    case "caption_gif":
+    case "star_sign":
       return <ImageIconOverlay overlay={ov} />;
     case "special":
       return <SpecialSnowOverlay overlay={ov} />;
     case "custome":
     case "background":
     case "decorative":
+    // Locket Dio v2 gradient text types (suggest=custom gradient, Dio templates).
+    case "custom":
+    case "template":
       return <GradientOverlay overlay={ov} />;
     case "time":
       return <TimeOverlay overlay={ov} />;
