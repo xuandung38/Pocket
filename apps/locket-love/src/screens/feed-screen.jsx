@@ -15,6 +15,7 @@ import MomentShareSheet from "../components/sheets/moment-share-sheet";
 import FriendMomentRow from "../components/friend-moment-row";
 import EmojiStudio from "../components/emoji-studio";
 import CaptionOverlay from "../components/caption-overlay/caption-overlay";
+import FeedVideo from "../components/feed-video";
 import {
   useAuthStore,
   useFriendStoreV2,
@@ -323,14 +324,10 @@ function MomentCard({
       >
         <div style={{ position: "absolute", inset: 0 }}>
           {video ? (
-            <video
+            <FeedVideo
               src={video}
               poster={image || undefined}
               style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-              muted
-              loop
-              playsInline
-              preload="metadata"
             />
           ) : image ? (
             <img
