@@ -1,5 +1,5 @@
 const ffmpegPath = require("ffmpeg-static");
-const ffprobePath = require("ffprobe-static").path;
+const ffprobePath = require("@ffprobe-installer/ffprobe").path;
 const ffmpeg = require("fluent-ffmpeg");
 const fs = require("fs");
 const os = require("os");
@@ -428,9 +428,9 @@ const convertFormat = (inputPath, outputPath, metadata) => {
 // MAIN PROCESSING FUNCTION
 // ============================================================================
 
-const processVideoBuffer = ({ videoBuffer, filename = "temp", maxSizeMB = 5 }) => {
+const processVideoBuffer = ({ videoBuffer, filename = "temp", maxSizeMB = 5, frameUrl = null }) => {
   return new Promise(async (resolve, reject) => {
-    logInfo("processVideoBuffer", `Start processing: ${filename}`);
+    logInfo("processVideoBuffer", `Start processing: ${filename}${frameUrl ? " (with PNG frame)" : ""}`);
 
     const tmpDir = getTempDir();
     const timestamp = Date.now();
@@ -463,10 +463,11 @@ const processVideoBuffer = ({ videoBuffer, filename = "temp", maxSizeMB = 5 }) =
       // STEP 2: Check if processing needed
       const processingCheck = needsProcessing(metadata, maxSizeMB);
       
-      if (!processingCheck.needed) {
+      if (!processingCheck.needed && !frameUrl) {
+        // Video is already 1080² mp4 under the size cap and no frame overlay needed.
         const resultBuffer = fs.readFileSync(inputPath);
         cleanup(...needsCleanup);
-        logSuccess("processVideoBuffer", 
+        logSuccess("processVideoBuffer",
           `Already optimized: ${metadata.sizeMB.toFixed(2)}MB - No processing needed`
         );
         return resolve(resultBuffer);
@@ -525,13 +526,34 @@ const processVideoBuffer = ({ videoBuffer, filename = "temp", maxSizeMB = 5 }) =
         }
       }
 
+      // STEP 6: Overlay PNG frame when requested (graceful fallback on any error).
+      // The frame PNG is downloaded from the URL, composited on top of the video
+      // via ffmpeg filter_complex, then the temp PNG is removed.
+      if (frameUrl) {
+        let framePng = null;
+        const framedPath = path.join(tmpDir, `${timestamp}_${filename}_framed.mp4`);
+        try {
+          framePng = await downloadFramePng(frameUrl, tmpDir, timestamp);
+          await overlayFrameOnVideo(currentPath, framePng, framedPath);
+          needsCleanup.push(framedPath);
+          currentPath = framedPath;
+          logSuccess("processVideoBuffer", "PNG frame baked into video");
+        } catch (frameErr) {
+          // Non-fatal: log and continue with the un-framed video.
+          logWarning("processVideoBuffer", `Frame overlay skipped: ${frameErr.message}`);
+          cleanup(framedPath);
+        } finally {
+          if (framePng) cleanup(framePng);
+        }
+      }
+
       // Final result
       const resultBuffer = fs.readFileSync(currentPath);
       const finalSize = resultBuffer.length / (1024 * 1024);
-      
+
       cleanup(...needsCleanup);
-      
-      logSuccess("processVideoBuffer", 
+
+      logSuccess("processVideoBuffer",
         `Final output: ${finalSize.toFixed(2)}MB (.mp4) - Completed`
       );
       resolve(resultBuffer);
@@ -541,6 +563,80 @@ const processVideoBuffer = ({ videoBuffer, filename = "temp", maxSizeMB = 5 }) =
       logInfo("processVideoBuffer", `Processing failed: ${error.message}`);
       reject(new Error("❌ Lỗi xử lý video: " + error.message));
     }
+  });
+};
+
+// ============================================================================
+// STEP 6: OVERLAY PNG FRAME (server-side bake for video + PNG frames)
+// ============================================================================
+
+/**
+ * Download the PNG frame from a URL into a temp file.
+ * Uses the global `fetch` available in Node 20+.
+ * Returns the local temp path, or throws on failure.
+ */
+const downloadFramePng = async (frameUrl, tmpDir, timestamp) => {
+  const response = await fetch(frameUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to download frame PNG: HTTP ${response.status} ${frameUrl}`);
+  }
+  const arrayBuffer = await response.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  const framePath = path.join(tmpDir, `${timestamp}_frame.png`);
+  fs.writeFileSync(framePath, buffer);
+  logInfo("downloadFramePng", `Downloaded frame: ${(buffer.length / 1024).toFixed(1)}KB → ${path.basename(framePath)}`);
+  return framePath;
+};
+
+/**
+ * Overlay a 1080×1080 PNG frame on top of a 1080×1080 mp4 video.
+ * The PNG is expected to be transparent in the centre and opaque on borders.
+ * Output is written to outputPath. Returns outputPath on success.
+ *
+ * filter_complex breakdown:
+ *   [1:v]scale=1080:1080[fr]   — ensure the PNG input matches the video size
+ *   [0:v][fr]overlay=0:0[v]   — composite frame on top of video at origin
+ */
+const overlayFrameOnVideo = (inputPath, framePng, outputPath) => {
+  return new Promise((resolve, reject) => {
+    logInfo("overlayFrameOnVideo", `Overlaying frame: ${path.basename(framePng)}`);
+
+    let timeout;
+    const command = ffmpeg(inputPath)
+      .input(framePng)
+      .complexFilter([
+        "[1:v]scale=1080:1080[fr]",
+        "[0:v][fr]overlay=0:0[v]",
+      ])
+      .outputOptions([
+        "-map [v]",
+        "-c:v libx264",
+        "-preset medium",
+        "-pix_fmt yuv420p",
+        "-movflags +faststart",
+        "-an",
+      ])
+      .format("mp4")
+      .on("start", (cmd) => {
+        logInfo("overlayFrameOnVideo", "Started");
+        timeout = setTimeout(() => {
+          command.kill("SIGKILL");
+          reject(new Error("Frame overlay timeout"));
+        }, COMPRESSION_TIMEOUT);
+      })
+      .on("end", () => {
+        clearTimeout(timeout);
+        const stats = fs.statSync(outputPath);
+        logSuccess("overlayFrameOnVideo", `Completed: ${(stats.size / (1024 * 1024)).toFixed(2)}MB`);
+        resolve(outputPath);
+      })
+      .on("error", (err) => {
+        clearTimeout(timeout);
+        cleanup(outputPath);
+        reject(err);
+      });
+
+    command.save(outputPath);
   });
 };
 

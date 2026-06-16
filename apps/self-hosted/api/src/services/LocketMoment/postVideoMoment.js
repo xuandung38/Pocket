@@ -84,7 +84,14 @@ const postVideoToLocket = async ({ userId, idToken, video, optionsData }) => {
         break;
 
       default:
-        throw new Error(`Không hỗ trợ type: ${type}`);
+        // Mirror the image dispatcher: unknown overlay types (e.g. location)
+        // degrade to a plain caption instead of 500-ing the whole post.
+        postData = creVideoPayload.videoPostPayloadDefault({
+          videoUrl,
+          thumbnailUrl,
+          optionsData,
+        });
+        break;
     }
 
     const response = await instanceLocketV2.post("postMomentV2", postData, {
@@ -193,7 +200,14 @@ const postVideoToLocketV2 = async ({
         break;
 
       default:
-        throw new Error(`Không hỗ trợ type: ${type}`);
+        // Mirror the image dispatcher: unknown overlay types (e.g. location)
+        // degrade to a plain caption instead of 500-ing the whole post.
+        postData = creVideoPayload.videoPostPayloadDefault({
+          videoUrl,
+          thumbnailUrl,
+          optionsData,
+        });
+        break;
     }
 
     const response = await instanceLocketV2.post("postMomentV2", postData, {

@@ -466,10 +466,13 @@ class LocketController {
           optionsData,
         });
       } else if (type === "video") {
+        // Pass the PNG frame URL (if provided) so ffmpeg can bake it into the video.
+        const frameUrl = optionsData?.video_frame_url || null;
         processedBuffer = await processServices.processVideoBuffer({
           videoBuffer: mediaBuffer,
           filename: name,
           maxSizeMB: 5,
+          frameUrl,
         });
 
         thumbBuffer = await processServices.generateThumbnail(
