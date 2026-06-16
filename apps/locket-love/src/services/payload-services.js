@@ -35,6 +35,7 @@ function determineRecipients(audience, selectedRecipients, localId) {
  * @param {object} [args.overlayData]        - sticker / overlay fields
  * @param {"all"|"selected"|"private"} [args.audience="all"]
  * @param {string[]} [args.recipients=[]]    - friend uids when `audience === "selected"`
+ * @param {string} [args.videoFrameUrl]      - PNG frame URL for server-side video overlay (PNG frames only)
  * @returns {Promise<object|null>}           - payload ready to POST, or null on auth-fail
  */
 export const createRequestPayloadV5 = async ({
@@ -44,6 +45,7 @@ export const createRequestPayloadV5 = async ({
   overlayData = {},
   audience = "all",
   recipients = [],
+  videoFrameUrl,
 } = {}) => {
   if (!mediaFile) throw new Error("createRequestPayloadV5: mediaFile is required");
 
@@ -67,6 +69,9 @@ export const createRequestPayloadV5 = async ({
     music: overlayData?.music || "",
     ...(overlayData.weatherData && { payload: overlayData.weatherData }),
     ...(overlayData.payload && { payload: overlayData.payload }),
+    // Include the PNG frame URL only when present — lets the backend bake the
+    // frame into the video via ffmpeg overlay without changing the default path.
+    ...(videoFrameUrl && { video_frame_url: videoFrameUrl }),
   };
 
   // Push the media to the self-hosted R2 storage service (presignedV3), exactly

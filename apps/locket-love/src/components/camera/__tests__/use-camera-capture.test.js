@@ -153,6 +153,23 @@ describe("useCameraCapture", () => {
       expect(FakeMediaRecorder._instances[0].state).toBe("recording");
     });
 
+    it("toggles isRecording true while recording, false after stop", async () => {
+      const { result } = await setup();
+
+      expect(result.current.isRecording).toBe(false);
+
+      act(() => {
+        result.current.handleCaptureDown();
+        vi.advanceTimersByTime(VIDEO_HOLD_MS + 10);
+      });
+      expect(result.current.isRecording).toBe(true);
+
+      act(() => {
+        result.current.handleCaptureUp();
+      });
+      expect(result.current.isRecording).toBe(false);
+    });
+
     it("stops recorder and calls setShot with video on pointer-up", async () => {
       const { result, setShot, setPhase } = await setup();
 

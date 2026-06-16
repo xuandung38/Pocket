@@ -116,6 +116,7 @@ export default function CameraScreen() {
   const {
     handleCaptureDown,
     handleCaptureUp,
+    isRecording,
   } = useCameraCapture({ streamRef, videoRef, setShot, setPhase, facingMode });
 
   // -------- One-shot prefetches --------
@@ -186,6 +187,12 @@ export default function CameraScreen() {
           }
         }
 
+        // For PNG frames on video: pass the frame URL to the backend so it can
+        // bake the overlay server-side via ffmpeg. The image path already handles
+        // composeFrame above; we only need the extra param for video + png.
+        const videoFrameUrl =
+          shot.type === "video" && frame?.type === "png" ? frame.url : undefined;
+
         const payload = await createRequestPayloadV5({
           mediaFile: fileToUpload,
           previewType: shot.type,
@@ -193,6 +200,7 @@ export default function CameraScreen() {
           overlayData,
           audience,
           recipients,
+          videoFrameUrl,
         });
         if (!payload) throw new Error("Không tạo được payload.");
 
@@ -434,9 +442,15 @@ export default function CameraScreen() {
                 onPointerDown={handleCaptureDown}
                 onPointerUp={handleCaptureUp}
                 onPointerLeave={handleCaptureUp}
-                style={{ touchAction: "none" }}
+                style={{
+                  touchAction: "none",
+                  WebkitTouchCallout: "none",
+                  WebkitUserSelect: "none",
+                  userSelect: "none",
+                  WebkitTapHighlightColor: "transparent",
+                }}
               >
-                <CaptureButton />
+                <CaptureButton recording={isRecording} />
               </div>
 
               {/* Platform-aware camera flip */}

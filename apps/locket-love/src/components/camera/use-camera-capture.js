@@ -15,8 +15,14 @@ const VIDEO_HOLD_MS = 350;
 const MAX_VIDEO_MS = 10_000;
 
 // Ordered mime fallback chain — the first entry the browser supports is used.
+// mp4/H.264 is listed first because iOS Safari can RECORD it but CANNOT play
+// back WebM in a <video> tag — recording WebM there makes the local capture
+// preview render black. Desktop Chrome rejects mp4 here and falls through to
+// WebM, which it plays fine.
 const MIME_CANDIDATES = [
+  "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
   "video/mp4;codecs=h264,aac",
+  "video/mp4",
   "video/webm;codecs=vp9,opus",
   "video/webm;codecs=vp8,opus",
   "video/webm",
@@ -37,6 +43,7 @@ export function useCameraCapture({ streamRef, videoRef, setShot, setPhase, facin
   const [torchSupported, setTorchSupported] = useState(false);
   const [zoomCaps, setZoomCaps] = useState(null); // { min, max, step } | null
   const [zoom, setZoom] = useState(1);
+  const [isRecording, setIsRecording] = useState(false);
 
   // ── internal refs ────────────────────────────────────────────────────────
   const mediaRecorderRef = useRef(null);
@@ -156,6 +163,7 @@ export function useCameraCapture({ streamRef, videoRef, setShot, setPhase, facin
       if (e.data?.size > 0) recordedChunksRef.current.push(e.data);
     };
     recorder.onstop = () => {
+      setIsRecording(false);
       const blob = new Blob(recordedChunksRef.current, {
         type: mimeType?.startsWith("video/mp4") ? "video/mp4" : "video/webm",
       });
@@ -170,6 +178,7 @@ export function useCameraCapture({ streamRef, videoRef, setShot, setPhase, facin
 
     mediaRecorderRef.current = recorder;
     recorder.start();
+    setIsRecording(true);
 
     // Hard cap — stops recording even if the user never releases the button.
     recordingTimeoutRef.current = setTimeout(() => {
@@ -217,6 +226,7 @@ export function useCameraCapture({ streamRef, videoRef, setShot, setPhase, facin
     stopRecording,
     handleCaptureDown,
     handleCaptureUp,
+    isRecording,
     // Torch
     flashOn,
     torchSupported,
