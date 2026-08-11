@@ -5,18 +5,29 @@ import { useAuthStore } from "@/stores";
 import { AppProvider } from "@/context/AppContext";
 import OptionMoment from "@/components/option-moment";
 import GlobalReactionEffect from "@/components/ui/global-reaction-effect";
+import AppErrorBoundary from "@/components/ui/app-error-boundary";
 
-const CameraScreen = lazy(() => import("./screens/camera-screen"));
-const FeedScreen = lazy(() => import("./screens/feed-screen"));
-const GridScreen = lazy(() => import("./screens/grid-screen"));
-const MemoriesScreen = lazy(() => import("./screens/memories-screen"));
-const ChatListScreen = lazy(() => import("./screens/chat-list-screen"));
-const ChatDetailScreen = lazy(() => import("./screens/chat-detail-screen"));
-const PhotoDetailScreen = lazy(() => import("./screens/photo-detail-screen"));
-const LoginScreen = lazy(() => import("./screens/login-screen"));
-const MessagesScreen = lazy(() => import("./screens/messages-screen"));
-const ActivityScreen = lazy(() => import("./screens/activity-screen"));
-const ProfileScreen = lazy(() => import("./screens/profile-screen"));
+// Retry once on chunk load failure (common after deploy when old chunks are purged)
+function lazyWithRetry(importFn) {
+  return lazy(() =>
+    importFn().catch(() => {
+      window.location.reload();
+      return importFn();
+    })
+  );
+}
+
+const CameraScreen = lazyWithRetry(() => import("./screens/camera-screen"));
+const FeedScreen = lazyWithRetry(() => import("./screens/feed-screen"));
+const GridScreen = lazyWithRetry(() => import("./screens/grid-screen"));
+const MemoriesScreen = lazyWithRetry(() => import("./screens/memories-screen"));
+const ChatListScreen = lazyWithRetry(() => import("./screens/chat-list-screen"));
+const ChatDetailScreen = lazyWithRetry(() => import("./screens/chat-detail-screen"));
+const PhotoDetailScreen = lazyWithRetry(() => import("./screens/photo-detail-screen"));
+const LoginScreen = lazyWithRetry(() => import("./screens/login-screen"));
+const MessagesScreen = lazyWithRetry(() => import("./screens/messages-screen"));
+const ActivityScreen = lazyWithRetry(() => import("./screens/activity-screen"));
+const ProfileScreen = lazyWithRetry(() => import("./screens/profile-screen"));
 
 // Minimal loading fallback — dark OLED bg to avoid flash
 function LoadingFallback() {
@@ -25,7 +36,7 @@ function LoadingFallback() {
       style={{
         position: "absolute",
         inset: 0,
-        background: "var(--bg-primary)",
+        background: "#0c0c0c",
       }}
     />
   );
@@ -77,6 +88,7 @@ export default function App() {
     // root keeps the provider stable across navigations.
     <AppProvider>
       <div className="phone-frame">
+        <AppErrorBoundary>
         <Suspense fallback={<LoadingFallback />}>
           <Routes>
             <Route path="/login" element={<LoginScreen />} />
@@ -94,6 +106,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
+        </AppErrorBoundary>
         {/* Global overlay — controlled by AppContext modals.optionMoment.
             Mounted once so any screen can trigger the sheet without remount. */}
         <OptionMoment />

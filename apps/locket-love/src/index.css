@@ -52,6 +52,10 @@ body,
 .phone-frame {
   width: 100%;
   max-width: 430px;
+  /* Fallback chain: % → vh → dvh */
+  height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
   height: 100dvh;
   margin: 0 auto;
   position: relative;

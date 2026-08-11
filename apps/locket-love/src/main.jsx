@@ -4,6 +4,11 @@ import { BrowserRouter } from "react-router-dom";
 import { Toaster } from "sonner";
 import App from "./App";
 import "./index.css";
+import { useAuthStore } from "@/stores/use-auth-store";
+
+// Sync hydrate before first render so RequireAuth sees correct isAuth state
+// on the very first paint (avoids flash-redirect to /login on hard reload).
+useAuthStore.getState().hydrate();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <BrowserRouter>
